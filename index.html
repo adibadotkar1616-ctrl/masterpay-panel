@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080611">
+<title>MASTERPAY™</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <img src="/assets/masterpay-logo.jpeg" class="logo" alt="MASTERPAY">
+    <div class="top-right"><span id="clock"></span><button id="logout" class="ghost hidden">Logout</button></div>
+  </header>
+
+  <div id="authView">
+    <section class="auth-card">
+      <div class="tabs"><button id="loginTab" class="tab active">Login</button><button id="registerTab" class="tab">Create Account</button></div>
+      <form id="loginForm">
+        <h1>Welcome back</h1><p class="muted">Sign in to your MASTERPAY panel.</p>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">Login</button>
+      </form>
+      <form id="registerForm" class="hidden">
+        <h1>Create account</h1><p class="muted">Set up your MASTERPAY account.</p>
+        <label>Full name<input name="name" required maxlength="120"></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+        <button class="primary" type="submit">Create Account</button>
+      </form>
+      <div id="authMsg" class="msg"></div>
+    </section>
+  </div>
+
+  <div id="panelView" class="hidden">
+    <nav class="nav">
+      <button data-view="dashboard" class="nav-btn active">Home</button>
+      <button data-view="profile" class="nav-btn">Profile</button>
+      <button data-view="kyc" class="nav-btn">KYC</button>
+      <button data-view="wallet" class="nav-btn">Wallet</button>
+      <button data-view="banks" class="nav-btn">Banks</button>
+      <button data-view="transactions" class="nav-btn">Transactions</button>
+      <button data-view="admin" id="adminNav" class="nav-btn hidden">Admin</button>
+    </nav>
+
+    <main>
+      <section id="dashboard" class="view active">
+        <div class="hero"><div><span class="eyebrow">MASTERPAY™ PANEL</span><h2 id="welcome">Dashboard</h2><p class="muted">Account management and activity.</p></div><span class="pill">Secure session</span></div>
+        <div class="cards">
+          <button data-view="wallet" class="card"><span>💰</span><b>WALLET</b><small>Balance</small></button>
+          <button data-view="banks" class="card"><span>🏦</span><b>BANK ACCOUNTS</b><small>Manage accounts</small></button>
+          <button data-view="transactions" class="card"><span>🔄</span><b>TRANSACTIONS</b><small>History</small></button>
+          <button data-view="kyc" class="card"><span>🪪</span><b>KYC</b><small id="kycCard">Not submitted</small></button>
+        </div>
+        <div class="summary panel"><h3>Account Summary</h3><div class="stats"><div><small>Wallet balance</small><strong id="dashBalance">₹0.00</strong></div><div><small>KYC</small><strong id="dashKyc">—</strong></div><div><small>Status</small><strong id="dashStatus">—</strong></div></div></div>
+      </section>
+
+      <section id="profile" class="view"><div class="panel"><h2>Profile</h2><div class="profile-grid"><div><small>Name</small><b id="pName">—</b></div><div><small>Email</small><b id="pEmail">—</b></div><div><small>Role</small><b id="pRole">—</b></div><div><small>Joined</small><b id="pJoined">—</b></div></div></div></section>
+
+      <section id="kyc" class="view"><div class="panel"><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice">Production KYC should be handled through a compliant provider. This starter intentionally does not collect identity documents.</div></div></section>
+
+      <section id="wallet" class="view"><div class="panel"><h2>Wallet</h2><div class="big" id="walletBalance">₹0.00</div><p class="muted">Server-side balance display. No demo button can directly change the balance.</p></div></section>
+
+      <section id="banks" class="view"><div class="panel"><h2>Bank Accounts</h2><div id="banksList" class="list">Loading…</div><div class="notice">Bank-detail creation is not enabled in this starter. Add a verified backend workflow before storing financial details.</div></div></section>
+
+      <section id="transactions" class="view"><div class="panel"><h2>Transactions</h2><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
+
+      <section id="admin" class="view"><div class="panel"><h2>Admin</h2><p class="muted">Admin foundation — read-only user list.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div></section>
+    </main>
+  </div>
+
+  <footer>© 2026 MASTERPAY™ · Original panel interface · Configure production compliance and payment services before launch.</footer>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

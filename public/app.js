@@ -49,7 +49,7 @@ async function loadData(){
   try{
     const b=await api("/api/banks");
     const banks=b.banks;
-    $("#banksList").innerHTML=banks.length?banks.map(x=>`<div class="bank-row"><span class="bank-icon">▣</span><div><b>${escapeHtml(x.bank_name)}</b><small>${escapeHtml(x.account_holder)} · Account ending ${escapeHtml(x.account_last4)}</small></div><em>${escapeHtml(x.status)}</em><button class="remove-bank" type="button" data-bank-id="${escapeHtml(x.id)}">Remove</button></div>`).join(""):"<div class='empty-state'><span>▣</span><b>No bank accounts</b><small>Add a bank account to prepare for verified withdrawals.</small></div>";
+    $("#banksList").innerHTML=banks.length?banks.map(x=>`<div class="bank-row"><span class="bank-icon">▣</span><div><b>${escapeHtml(x.bank_name)}</b><small>${escapeHtml(x.account_holder)} · ${escapeHtml(x.account_type || "savings")} · ${escapeHtml(x.ifsc_code || "")} · Account ending ${escapeHtml(x.account_last4)}</small></div><em>${escapeHtml(x.status)}</em><button class="remove-bank" type="button" data-bank-id="${escapeHtml(x.id)}">Remove</button></div>`).join(""):"<div class='empty-state'><span>▣</span><b>No bank accounts</b><small>Add a bank account to prepare for verified withdrawals.</small></div>";
     const select=$("#withdrawBank");
     if(select) select.innerHTML='<option value="">Select a verified bank account</option>'+banks.filter(x=>x.status==='verified').map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.bank_name)} · ••••${escapeHtml(x.account_last4)}</option>`).join("");
     $$(".remove-bank").forEach(btn=>btn.onclick=async()=>{
@@ -111,6 +111,9 @@ $("#withdrawForm")?.addEventListener("submit",async(e)=>{
 $("#bankForm")?.addEventListener("submit",async(e)=>{
   e.preventDefault(); $("#bankMsg").textContent="Saving bank account…";
   const body=Object.fromEntries(new FormData(e.target));
+  body.ifsc_code=String(body.ifsc_code||"").trim().toUpperCase();
+  body.account_number=String(body.account_number||"").replace(/\s+/g,"");
+  body.mobile_number=String(body.mobile_number||"").replace(/\D/g,"");
   try{await api("/api/banks",{method:"POST",body:JSON.stringify(body)});$("#bankMsg").textContent="Bank account added and marked pending."; e.target.reset(); await loadData();}
   catch(err){$("#bankMsg").textContent=err.message;}
 });

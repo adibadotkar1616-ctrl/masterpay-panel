@@ -176,7 +176,7 @@ function requireSameOrigin(req, res, next) {
 app.get("/api/banks", auth, async (req, res) => {
   if (!requireDb(res)) return;
   const result = await pool.query(
-    `SELECT id,bank_name,account_holder,account_last4,status,created_at
+    `SELECT id,bank_name,account_type,account_holder,account_last4,ifsc_code,mobile_number,status,created_at
      FROM bank_accounts WHERE user_id=$1 ORDER BY created_at DESC`,
     [req.user.sub]
   );
@@ -185,19 +185,22 @@ app.get("/api/banks", auth, async (req, res) => {
 
 app.post("/api/banks", auth, requireSameOrigin, async (req, res) => {
   if (!requireDb(res)) return;
-  const { bank_name, account_holder, account_number } = req.body || {};
+  const { bank_name, account_type, account_holder, account_number, ifsc_code, mobile_number } = req.body || {};
   const bankName = String(bank_name || "").trim();
+  const accountType = String(account_type || "").trim().toLowerCase();
   const holder = String(account_holder || "").trim();
   const accountNumber = String(account_number || "").replace(/\s+/g, "");
-  if (!bankName || bankName.length > 120 || !holder || holder.length > 120 || !/^\d{6,24}$/.test(accountNumber)) {
-    return res.status(400).json({ ok:false, message:"Enter a valid bank name, account holder and 6–24 digit account number." });
+  const ifsc = String(ifsc_code || "").trim().toUpperCase();
+  const mobile = String(mobile_number || "").replace(/\D/g, "");
+  if (!bankName || bankName.length > 120 || !["savings","current","corporate"].includes(accountType) || !holder || holder.length > 120 || !/^\d{6,24}$/.test(accountNumber) || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc) || !/^[6-9]\d{9}$/.test(mobile)) {
+    return res.status(400).json({ ok:false, message:"Enter valid bank, account type, account number, IFSC code, account holder name and 10-digit mobile number." });
   }
   try {
     const result = await pool.query(
-      `INSERT INTO bank_accounts(user_id,bank_name,account_holder,account_last4,status)
-       VALUES($1,$2,$3,$4,'pending')
-       RETURNING id,bank_name,account_holder,account_last4,status,created_at`,
-      [req.user.sub, bankName, holder, accountNumber.slice(-4)]
+      `INSERT INTO bank_accounts(user_id,bank_name,account_type,account_holder,account_last4,ifsc_code,mobile_number,status)
+       VALUES($1,$2,$3,$4,$5,$6,$7,'pending')
+       RETURNING id,bank_name,account_type,account_holder,account_last4,ifsc_code,mobile_number,status,created_at`,
+      [req.user.sub, bankName, accountType, holder, accountNumber.slice(-4), ifsc, mobile]
     );
     res.status(201).json({ ok:true, bank:result.rows[0] });
   } catch (e) {

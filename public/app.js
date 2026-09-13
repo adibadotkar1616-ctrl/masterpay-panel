@@ -264,8 +264,40 @@ $("#markNotificationsRead")?.addEventListener('click',async()=>{
   try{await api('/api/notifications/read-all',{method:'POST'}); await loadNotifications();}catch(e){console.error(e);}
 });
 
+let demoPollingBusy=false;
+async function refreshDemoUi(){
+  if(demoPollingBusy) return;
+  demoPollingBusy=true;
+  try{
+    await loadDemoCommission();
+    await loadNotifications(true);
+    const t=await api("/api/transactions");
+    const body=$("#txBody");
+    if(body) body.innerHTML=t.transactions.length?t.transactions.map(x=>{
+      const isDemo=String(x.reference||'').startsWith('SIM-DEMO-');
+      const credit=x.type==='deposit';
+      const name=isDemo ? (credit?'Demo Customer':'Demo Payout') : x.type;
+      return `<tr class="${isDemo?'demo-row':''}"><td><div class="tx-name"><span class="tx-avatar ${credit?'credit':'debit'}">${credit?'+':'−'}</span><span><b>${escapeHtml(demoType(x))}</b><small>${escapeHtml(name)}</small></span></div></td><td class="${credit?'amount-credit':'amount-debit'}">${credit?'+':'−'}${money(x.amount)}</td><td>${isDemo?money(demoCommission(x)):'—'}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`;
+    }).join(""):`<tr><td colspan="5">No transactions.</td></tr>`;
+  }catch(e){ console.error('Demo refresh failed:',e); }
+  finally{ demoPollingBusy=false; }
+}
+
+$("#startDemoActivity")?.addEventListener('click',async()=>{
+  const amount=Number($("#depositPlan")?.value||10000);
+  const button=$("#startDemoActivity");
+  if(button) button.disabled=true;
+  $("#walletMsg").textContent="Starting demo transaction activity…";
+  try{
+    const d=await api('/api/demo/start',{method:'POST',body:JSON.stringify({amount})});
+    $("#walletMsg").textContent=d.message;
+    await refreshDemoUi();
+  }catch(e){ $("#walletMsg").textContent=e.message; }
+  finally{ if(button) button.disabled=false; }
+});
+
 $("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); location.reload(); };
 
 function tick(){ $("#clock").textContent=new Date().toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}); }
 tick(); setInterval(tick,1000);
-api("/api/me").then(loadData).catch(()=>{});
+api("/api/me").then(async()=>{ await loadData(); setInterval(refreshDemoUi,4000); }).catch(()=>{});

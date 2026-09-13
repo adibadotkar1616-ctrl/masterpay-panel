@@ -92,6 +92,7 @@ $("#openDeposit").onclick=()=>{ $("#depositPanel").classList.remove("hidden"); $
 $("#openWithdraw").onclick=()=>{ $("#withdrawPanel").classList.remove("hidden"); $("#depositPanel").classList.add("hidden"); };
 $("#openBankForm").onclick=()=>$("#bankPanel").classList.remove("hidden");
 $("#openBankFromWallet").onclick=()=>{ document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); $("#banks").classList.add("active"); $("#bankPanel").classList.remove("hidden"); window.scrollTo({top:0,behavior:"smooth"}); };
+$("#bindWithdrawalBank")?.addEventListener("click",()=>$("#openBankFromWallet").click());
 $$('.close-form').forEach(b=>b.onclick=()=>b.closest('.form-panel')?.classList.add('hidden'));
 
 $("#depositForm")?.addEventListener("submit",async(e)=>{

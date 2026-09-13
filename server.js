@@ -47,6 +47,21 @@ async function ensurePaymentSettings(){
   await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS utr TEXT`);
 }
 
+async function ensureDemoTables(){
+  if(!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      is_read BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS notifications_user_created_idx ON notifications(user_id,created_at DESC)`);
+}
+
 async function ensureAdminAccount(){
   if(!pool) return;
   const email=String(process.env.ADMIN_EMAIL||"").trim().toLowerCase();
@@ -441,6 +456,34 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
   }
 });
 
+app.post("/api/demo/start", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  const requestedAmount = Number(req.body?.amount);
+  const amount = Number.isFinite(requestedAmount) && requestedAmount >= 1 && requestedAmount <= 1000000
+    ? requestedAmount : 10000;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const bank = await client.query(
+      `SELECT id,bank_name,account_last4,status FROM bank_accounts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [req.user.sub]
+    );
+    if (!bank.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ok:false,message:"Add a bank account first. This demo needs a linked account."});
+    }
+    const demo = await createDemoActivity(client, req.user.sub, amount, bank.rows[0]);
+    await client.query('COMMIT');
+    res.status(201).json({ok:true,demo,message:`Demo activity started for ${moneyForDb(amount)}. Simulation only; no real funds moved.`});
+  } catch(e) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not start demo activity."});
+  } finally {
+    client.release();
+  }
+});
+
 app.get("/api/commission-summary", auth, async (req, res) => {
   if (!requireDb(res)) return;
   try {
@@ -544,6 +587,7 @@ app.use((_req, res) => {
 (async()=>{
   try{
     await ensurePaymentSettings();
+    await ensureDemoTables();
     await ensureAdminAccount();
   } catch(e){
     console.error("Startup initialization failed:",e.message);

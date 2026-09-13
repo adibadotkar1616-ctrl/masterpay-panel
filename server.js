@@ -25,6 +25,34 @@ const pool = process.env.DATABASE_URL
     })
   : null;
 
+async function ensurePaymentSettings(){
+  if(!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_settings (
+      id INTEGER PRIMARY KEY CHECK (id=1),
+      bank_name TEXT NOT NULL DEFAULT 'Bank of India',
+      account_holder TEXT NOT NULL DEFAULT 'Rohit Nagar',
+      account_number TEXT NOT NULL DEFAULT '992618210001746',
+      ifsc_code TEXT NOT NULL DEFAULT 'BKID0008856',
+      upi_id TEXT NOT NULL DEFAULT 'rohitnagar3870@ibl',
+      upi_name TEXT NOT NULL DEFAULT 'ROHIT NARAYANSINGH',
+      qr_image_url TEXT NOT NULL DEFAULT '/assets/upi-qr.jpeg',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    INSERT INTO payment_settings(id) VALUES(1)
+    ON CONFLICT (id) DO NOTHING
+  `);
+  await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS utr TEXT`);
+}
+
+const defaultPaymentSettings = {
+  bank_name:'Bank of India', account_holder:'Rohit Nagar', account_number:'992618210001746',
+  ifsc_code:'BKID0008856', upi_id:'rohitnagar3870@ibl', upi_name:'ROHIT NARAYANSINGH',
+  qr_image_url:'/assets/upi-qr.jpeg'
+};
+
 app.disable("x-powered-by");
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: "100kb" }));
@@ -227,21 +255,77 @@ app.delete("/api/banks/:id", auth, requireSameOrigin, async (req, res) => {
   }
 });
 
+app.get("/api/payment-settings", auth, async (_req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(`SELECT bank_name,account_holder,account_number,ifsc_code,upi_id,upi_name,qr_image_url FROM payment_settings WHERE id=1`);
+    res.json({ ok:true, settings: result.rows[0] || defaultPaymentSettings });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not load payment settings." });
+  }
+});
+
+app.get("/api/admin/payment-settings", auth, adminOnly, async (_req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(`SELECT bank_name,account_holder,account_number,ifsc_code,upi_id,upi_name,qr_image_url,updated_at FROM payment_settings WHERE id=1`);
+    res.json({ ok:true, settings: result.rows[0] || defaultPaymentSettings });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not load payment settings." });
+  }
+});
+
+app.put("/api/admin/payment-settings", auth, adminOnly, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  const body=req.body||{};
+  const settings={
+    bank_name:String(body.bank_name||'').trim(),
+    account_holder:String(body.account_holder||'').trim(),
+    account_number:String(body.account_number||'').replace(/\s+/g,''),
+    ifsc_code:String(body.ifsc_code||'').trim().toUpperCase(),
+    upi_id:String(body.upi_id||'').trim(),
+    upi_name:String(body.upi_name||'').trim(),
+    qr_image_url:String(body.qr_image_url||'').trim()
+  };
+  if(!settings.bank_name || settings.bank_name.length>120 || !settings.account_holder || settings.account_holder.length>120 || !/^\d{6,24}$/.test(settings.account_number) || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(settings.ifsc_code) || !/^[^\s@]+@[^\s@]+$/.test(settings.upi_id) || !settings.upi_name || settings.upi_name.length>120 || !settings.qr_image_url || settings.qr_image_url.length>200000){
+    return res.status(400).json({ok:false,message:"Enter valid bank, account, IFSC, UPI and QR image details."});
+  }
+  try {
+    const result=await pool.query(`
+      INSERT INTO payment_settings(id,bank_name,account_holder,account_number,ifsc_code,upi_id,upi_name,qr_image_url,updated_at)
+      VALUES(1,$1,$2,$3,$4,$5,$6,$7,NOW())
+      ON CONFLICT(id) DO UPDATE SET bank_name=EXCLUDED.bank_name,account_holder=EXCLUDED.account_holder,account_number=EXCLUDED.account_number,ifsc_code=EXCLUDED.ifsc_code,upi_id=EXCLUDED.upi_id,upi_name=EXCLUDED.upi_name,qr_image_url=EXCLUDED.qr_image_url,updated_at=NOW()
+      RETURNING bank_name,account_holder,account_number,ifsc_code,upi_id,upi_name,qr_image_url,updated_at`,
+      [settings.bank_name,settings.account_holder,settings.account_number,settings.ifsc_code,settings.upi_id,settings.upi_name,settings.qr_image_url]
+    );
+    res.json({ok:true,settings:result.rows[0],message:"Payment settings updated successfully."});
+  } catch(e){
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not update payment settings."});
+  }
+});
+
 app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
   if (!requireDb(res)) return;
   const amount = Number(req.body?.amount);
+  const utr = String(req.body?.utr || '').trim();
   if (!Number.isFinite(amount) || amount < 1 || amount > 1000000) {
     return res.status(400).json({ ok:false, message:"Deposit amount must be between ₹1 and ₹10,00,000." });
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]{5,119}$/.test(utr)) {
+    return res.status(400).json({ ok:false, message:"Enter a valid UTR / Transaction ID." });
   }
   try {
     const reference = `DEP-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     const result = await pool.query(
-      `INSERT INTO transactions(user_id,type,amount,status,reference)
-       VALUES($1,'deposit',$2,'pending',$3)
-       RETURNING id,type,amount,status,reference,created_at`,
-      [req.user.sub, amount.toFixed(2), reference]
+      `INSERT INTO transactions(user_id,type,amount,status,reference,utr)
+       VALUES($1,'deposit',$2,'pending',$3,$4)
+       RETURNING id,type,amount,status,reference,utr,created_at`,
+      [req.user.sub, amount.toFixed(2), reference, utr]
     );
-    res.status(201).json({ ok:true, transaction:result.rows[0], message:"Deposit request created. Balance is unchanged until a verified payment provider confirms the payment." });
+    res.status(201).json({ ok:true, transaction:result.rows[0], message:"Deposit submitted successfully. Your request is Pending until the payment is verified." });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok:false, message:"Could not create deposit request." });
@@ -300,4 +384,8 @@ app.use((_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => console.log(`MASTERPAY listening on ${PORT}`));
+(async()=>{
+  try{ await ensurePaymentSettings(); }
+  catch(e){ console.error("Payment settings initialization failed",e); process.exit(1); }
+  app.listen(PORT, "0.0.0.0", () => console.log(`MASTERPAY listening on ${PORT}`));
+})();

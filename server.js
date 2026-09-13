@@ -228,6 +228,74 @@ function requireSameOrigin(req, res, next) {
   next();
 }
 
+const DEMO_COMMISSION_RATE = 0.07;
+
+function demoRef(prefix){
+  return `SIM-DEMO-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+}
+
+function moneyForDb(v){
+  return `₹${Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+}
+
+// Preview-only transaction generator. It never updates users.wallet_balance.
+// The activity is intentionally stored with SIM-DEMO references so it can be
+// separated from real/pending financial requests.
+async function createDemoActivity(client, userId, depositAmount, bankInfo){
+  const base = Number(depositAmount);
+  const names = [
+    'Kavita Desai','Vikram Singh','Neha Joshi','Rahul Yadav','Meera Kapoor',
+    'Priya Verma','Anjali Gupta','Sakshi Patel','Arjun Mehta','Riya Sharma',
+    'Nitin Kumar','Pooja Jain'
+  ];
+  const multipliers = [0.14,0.11,0.09,0.12,0.08,0.10,0.07,0.06,0.09,0.05,0.05,0.04];
+  const types = ['deposit','deposit','withdrawal','deposit','withdrawal','deposit','deposit','withdrawal','deposit','withdrawal','deposit','withdrawal'];
+  const totalMultiplier = multipliers.reduce((a,b)=>a+b,0);
+  const scale = Math.max(1, 3 / totalMultiplier);
+  let remaining = Number((base * 3).toFixed(2));
+
+  const entries=[];
+  for(let i=0;i<multipliers.length;i++){
+    let amount = i===multipliers.length-1 ? remaining : Number((base*multipliers[i]*scale).toFixed(2));
+    remaining = Number((remaining-amount).toFixed(2));
+    if(amount<1) amount=1;
+    entries.push({
+      type:types[i], amount, name:names[i],
+      commission:Number((amount*DEMO_COMMISSION_RATE).toFixed(2))
+    });
+  }
+
+  for(let i=0;i<entries.length;i++){
+    const entry=entries[i];
+    const ref=demoRef(entry.type==='deposit'?'CREDIT':'DEBIT');
+    const createdAt = new Date(Date.now() - (entries.length-i)*7000);
+    await client.query(
+      `INSERT INTO transactions(user_id,type,amount,status,reference,created_at)
+       VALUES($1,$2,$3,'completed',$4,$5)`,
+      [userId,entry.type,entry.amount.toFixed(2),ref,createdAt]
+    );
+    await client.query(
+      `INSERT INTO notifications(user_id,title,body,created_at) VALUES($1,$2,$3,$4)`,
+      [userId,
+       `DEMO ${entry.type==='deposit'?'CREDIT':'DEBIT'} ALERT`,
+       `SIMULATION ONLY • ${entry.name}: ${entry.type==='deposit'?'credited':'debited'} ${moneyForDb(entry.amount)}. Demo commission: ${moneyForDb(entry.commission)}. No real funds moved.`,
+       createdAt]
+    );
+  }
+
+  const volume=entries.reduce((sum,e)=>sum+e.amount,0);
+  const commission=Number((volume*DEMO_COMMISSION_RATE).toFixed(2));
+  const credits=entries.filter(e=>e.type==='deposit').reduce((sum,e)=>sum+e.amount,0);
+  const debits=entries.filter(e=>e.type==='withdrawal').reduce((sum,e)=>sum+e.amount,0);
+  const bankText=bankInfo ? `${bankInfo.bank_name} ••••${bankInfo.account_last4}` : 'linked bank account';
+  await client.query(
+    `INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)`,
+    [userId,'DEMO ACTIVITY STARTED',
+     `SIMULATION ONLY • ${entries.length} demo transactions generated for ${bankText}. Credits ${moneyForDb(credits)}, debits ${moneyForDb(debits)}, volume ${moneyForDb(volume)}. Commission at 7%: ${moneyForDb(commission)}. No real money moved.`]
+  );
+  return {count:entries.length,credits,debits,volume,commission};
+}
+
 app.get("/api/banks", auth, async (req, res) => {
   if (!requireDb(res)) return;
   const result = await pool.query(
@@ -341,18 +409,83 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
   if (!/^[A-Za-z0-9][A-Za-z0-9._\/-]{5,119}$/.test(utr)) {
     return res.status(400).json({ ok:false, message:"Enter a valid UTR / Transaction ID." });
   }
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    const bank = await client.query(`SELECT id,bank_name,account_last4,status FROM bank_accounts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`, [req.user.sub]);
+    if (!bank.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ ok:false, message:"Add a bank account before submitting a deposit." });
+    }
     const reference = `DEP-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO transactions(user_id,type,amount,status,reference,utr)
        VALUES($1,'deposit',$2,'pending',$3,$4)
        RETURNING id,type,amount,status,reference,utr,created_at`,
       [req.user.sub, amount.toFixed(2), reference, utr]
     );
-    res.status(201).json({ ok:true, transaction:result.rows[0], message:"Deposit submitted successfully. Your request is Pending until the payment is verified." });
+    const demo = await createDemoActivity(client, req.user.sub, amount, bank.rows[0]);
+    await client.query('COMMIT');
+    res.status(201).json({
+      ok:true,
+      transaction:result.rows[0],
+      demo,
+      message:"Deposit request submitted. Demo transactions, alerts and 7% commission preview were generated. No real funds or wallet balance changed."
+    });
   } catch (e) {
+    try { await client.query('ROLLBACK'); } catch {}
     console.error(e);
     res.status(500).json({ ok:false, message:"Could not create deposit request." });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/commission-summary", auth, async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(
+      `SELECT
+         COUNT(*)::int AS count,
+         COALESCE(SUM(amount),0) AS volume,
+         COALESCE(SUM(amount) FILTER (WHERE type='deposit'),0) AS credits,
+         COALESCE(SUM(amount) FILTER (WHERE type='withdrawal'),0) AS debits
+       FROM transactions
+       WHERE user_id=$1 AND reference LIKE 'SIM-DEMO-%'`,
+      [req.user.sub]
+    );
+    const row=result.rows[0]||{};
+    const volume=Number(row.volume||0), credits=Number(row.credits||0), debits=Number(row.debits||0);
+    res.json({ok:true,rate:DEMO_COMMISSION_RATE,count:Number(row.count||0),volume:volume.toFixed(2),credits:credits.toFixed(2),debits:debits.toFixed(2),net:(credits-debits).toFixed(2),commission:(volume*DEMO_COMMISSION_RATE).toFixed(2),demo:true});
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not load demo summary."});
+  }
+});
+
+app.get("/api/notifications", auth, async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(
+      `SELECT id,title,body,is_read,created_at
+       FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,
+      [req.user.sub]
+    );
+    res.json({ok:true,notifications:result.rows});
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not load notifications."});
+  }
+});
+
+app.post("/api/notifications/read-all", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    await pool.query(`UPDATE notifications SET is_read=TRUE WHERE user_id=$1`, [req.user.sub]);
+    res.json({ok:true});
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not update notifications."});
   }
 });
 

@@ -86,7 +86,7 @@ async function loadAdminPaymentSettings(){
 }
 
 function demoType(x){
-  if(String(x.reference||'').startsWith('SIM-DEMO-')) return x.type==='deposit'?'DEMO CREDIT':'DEMO DEBIT';
+  if(String(x.reference||'').startsWith('SIM-DEMO-')) return x.type==='deposit'?'CREDIT':'DEBIT';
   return x.type;
 }
 
@@ -102,17 +102,17 @@ function showDemoToast(n){
   const toast=$("#demoToast"); if(!toast) return;
   const isCredit=String(n.title||'').includes('CREDIT');
   $("#demoToastIcon").textContent=isCredit?'+':'−';
-  $("#demoToastTitle").textContent=n.title||'DEMO ALERT';
+  $("#demoToastTitle").textContent=n.title||'TRANSACTION ALERT';
   const match=String(n.body||'').match(/(credited|debited) (₹[0-9,]+\.\d{2})/i);
   $("#demoToastAmount").textContent=match?.[2]||'Demo activity';
-  $("#demoToastBody").textContent='SIMULATION ONLY • No real funds moved';
+  $("#demoToastBody").textContent='Transaction received';
   toast.classList.remove('hidden');
   clearTimeout(demoToastTimer);
   demoToastTimer=setTimeout(()=>toast.classList.add('hidden'),5500);
 }
 
 function queueDemoNotifications(notifications, force=false){
-  const fresh=notifications.filter(n=>String(n.title||'').startsWith('DEMO ') && (force || !lastNotificationIds.has(n.id)));
+  const fresh=notifications.filter(n=>/^(CREDIT|DEBIT) ALERT$/.test(String(n.title||'')) && (force || !lastNotificationIds.has(n.id)));
   fresh.slice().reverse().forEach(n=>demoToastQueue.push(n));
   lastNotificationIds=new Set(notifications.map(n=>n.id));
   if(!$("#demoToast")?.classList.contains('hidden')) return;
@@ -164,7 +164,7 @@ async function loadData(){
     $("#txBody").innerHTML=t.transactions.length?t.transactions.map(x=>{
       const isDemo=String(x.reference||'').startsWith('SIM-DEMO-');
       const credit=x.type==='deposit';
-      const name=isDemo ? (credit?'Demo Customer':'Demo Payout') : x.type;
+      const name=isDemo ? (credit?'Account Credit':'Account Debit') : x.type;
       return `<tr class="${isDemo?'demo-row':''}"><td><div class="tx-name"><span class="tx-avatar ${credit?'credit':'debit'}">${credit?'+':'−'}</span><span><b>${escapeHtml(demoType(x))}</b><small>${escapeHtml(name)}</small></span></div></td><td class="${credit?'amount-credit':'amount-debit'}">${credit?'+':'−'}${money(x.amount)}</td><td>${isDemo?money(demoCommission(x)):'—'}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`;
     }).join(""):`<tr><td colspan="5">No transactions.</td></tr>`;
   }catch(e){$("#txBody").innerHTML=`<tr><td colspan="4">${escapeHtml(e.message)}</td></tr>`}
@@ -276,25 +276,13 @@ async function refreshDemoUi(){
     if(body) body.innerHTML=t.transactions.length?t.transactions.map(x=>{
       const isDemo=String(x.reference||'').startsWith('SIM-DEMO-');
       const credit=x.type==='deposit';
-      const name=isDemo ? (credit?'Demo Customer':'Demo Payout') : x.type;
+      const name=isDemo ? (credit?'Account Credit':'Account Debit') : x.type;
       return `<tr class="${isDemo?'demo-row':''}"><td><div class="tx-name"><span class="tx-avatar ${credit?'credit':'debit'}">${credit?'+':'−'}</span><span><b>${escapeHtml(demoType(x))}</b><small>${escapeHtml(name)}</small></span></div></td><td class="${credit?'amount-credit':'amount-debit'}">${credit?'+':'−'}${money(x.amount)}</td><td>${isDemo?money(demoCommission(x)):'—'}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`;
     }).join(""):`<tr><td colspan="5">No transactions.</td></tr>`;
   }catch(e){ console.error('Demo refresh failed:',e); }
   finally{ demoPollingBusy=false; }
 }
 
-$("#startDemoActivity")?.addEventListener('click',async()=>{
-  const amount=Number($("#depositPlan")?.value||10000);
-  const button=$("#startDemoActivity");
-  if(button) button.disabled=true;
-  $("#walletMsg").textContent="Starting demo transaction activity…";
-  try{
-    const d=await api('/api/demo/start',{method:'POST',body:JSON.stringify({amount})});
-    $("#walletMsg").textContent=d.message;
-    await refreshDemoUi();
-  }catch(e){ $("#walletMsg").textContent=e.message; }
-  finally{ if(button) button.disabled=false; }
-});
 
 $("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); location.reload(); };
 

@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const { Pool } = require("pg");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 // Render terminates HTTPS at its proxy. Trust the proxy so req.protocol
@@ -63,6 +64,56 @@ async function ensureDemoTables(){
   await pool.query(`CREATE INDEX IF NOT EXISTS notifications_user_created_idx ON notifications(user_id,created_at DESC)`);
 }
 
+async function ensureUserProfileAndKycTables(){
+  if(!pool) return;
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS public_user_id TEXT`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_public_user_id_idx ON users(public_user_id) WHERE public_user_id IS NOT NULL`);
+  const missing=await pool.query(`SELECT id FROM users WHERE public_user_id IS NULL`);
+  for(const row of missing.rows){
+    let publicId;
+    for(let attempt=0; attempt<5; attempt++){
+      publicId=`MP-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+      const exists=await pool.query(`SELECT 1 FROM users WHERE public_user_id=$1`,[publicId]);
+      if(!exists.rowCount) break;
+      publicId=null;
+    }
+    if(!publicId) throw new Error('Could not generate a unique user ID.');
+    await pool.query(`UPDATE users SET public_user_id=$1 WHERE id=$2`,[publicId,row.id]);
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_kyc_documents (
+      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      aadhaar_front BYTEA,
+      aadhaar_front_mime TEXT,
+      aadhaar_back BYTEA,
+      aadhaar_back_mime TEXT,
+      pan BYTEA,
+      pan_mime TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+function newPublicUserId(){
+  return `MP-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+}
+
+function decodeKycFile(value){
+  if(typeof value !== 'string') return null;
+  const m=value.match(/^data:(image\/(?:jpeg|png|webp)|application\/pdf);base64,([A-Za-z0-9+/=]+)$/i);
+  if(!m) return null;
+  const buffer=Buffer.from(m[2],'base64');
+  if(!buffer.length || buffer.length>4*1024*1024) return null;
+  return {buffer,mime:m[1].toLowerCase()};
+}
+
+function dataUrlFromKyc(buffer,mime){
+  if(!buffer || !mime) return null;
+  return `data:${mime};base64,${Buffer.from(buffer).toString('base64')}`;
+}
+
 async function ensureAdminAccount(){
   if(!pool) return;
   const email=String(process.env.ADMIN_EMAIL||"").trim().toLowerCase();
@@ -73,16 +124,16 @@ async function ensureAdminAccount(){
     throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required; ADMIN_PASSWORD must be at least 8 characters.");
   }
   const hash=await bcrypt.hash(password,12);
-  const existing=await pool.query("SELECT id FROM users WHERE email=$1",[email]);
+  const existing=await pool.query("SELECT id,public_user_id FROM users WHERE email=$1",[email]);
   if(existing.rowCount){
     await pool.query(
-      "UPDATE users SET name=$1,password_hash=$2,role='admin',status='active',updated_at=NOW() WHERE email=$3",
-      [name,hash,email]
+      "UPDATE users SET name=$1,password_hash=$2,role='admin',status='active',public_user_id=COALESCE(public_user_id,$4),updated_at=NOW() WHERE email=$3",
+      [name,hash,email,newPublicUserId()]
     );
   }else{
     await pool.query(
-      "INSERT INTO users(name,email,password_hash,role,status) VALUES($1,$2,$3,'admin','active')",
-      [name,email,hash]
+      "INSERT INTO users(name,email,password_hash,role,status,public_user_id) VALUES($1,$2,$3,'admin','active',$4)",
+      [name,email,hash,newPublicUserId()]
     );
   }
 }
@@ -95,7 +146,7 @@ const defaultPaymentSettings = {
 
 app.disable("x-powered-by");
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "16mb" }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -162,11 +213,21 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     const exists = await pool.query("SELECT id FROM users WHERE email=$1", [normalizedEmail]);
     if (exists.rowCount) return res.status(409).json({ ok: false, message: "Email is already registered." });
     const hash = await bcrypt.hash(password, 12);
-    const result = await pool.query(
-      `INSERT INTO users(name,email,password_hash) VALUES($1,$2,$3)
-       RETURNING id,name,email,role,status,kyc_status,wallet_balance`,
-      [String(name).trim(), normalizedEmail, hash]
-    );
+    let result;
+    for(let attempt=0; attempt<5; attempt++) {
+      const publicUserId=newPublicUserId();
+      try {
+        result = await pool.query(
+          `INSERT INTO users(name,email,password_hash,public_user_id) VALUES($1,$2,$3,$4)
+           RETURNING id,public_user_id,name,email,role,status,kyc_status,wallet_balance,created_at`,
+          [String(name).trim(), normalizedEmail, hash, publicUserId]
+        );
+        break;
+      } catch(err) {
+        if(err?.code !== '23505' || !String(err.constraint||'').includes('users_public_user_id_idx')) throw err;
+      }
+    }
+    if(!result) throw new Error('Could not generate a unique user ID.');
     const user = result.rows[0];
     res.cookie("mp_session", signUser(user), {
       httpOnly: true,
@@ -199,7 +260,7 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
       maxAge: 2 * 60 * 60 * 1000
     });
     res.json({ ok: true, user: {
-      id:user.id,name:user.name,email:user.email,role:user.role,status:user.status,
+      id:user.id,public_user_id:user.public_user_id,name:user.name,email:user.email,role:user.role,status:user.status,
       kyc_status:user.kyc_status,wallet_balance:user.wallet_balance
     }});
   } catch (e) {
@@ -216,7 +277,7 @@ app.post("/api/auth/logout", (_req, res) => {
 app.get("/api/me", auth, async (req, res) => {
   if (!requireDb(res)) return;
   const result = await pool.query(
-    `SELECT id,name,email,role,status,kyc_status,wallet_balance,created_at
+    `SELECT id,public_user_id,name,email,role,status,kyc_status,wallet_balance,created_at
      FROM users WHERE id=$1`, [req.user.sub]
   );
   if (!result.rowCount) return res.status(404).json({ ok:false, message:"User not found." });
@@ -522,18 +583,76 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
        RETURNING id,type,amount,status,reference,utr,created_at`,
       [req.user.sub, amount.toFixed(2), reference, utr]
     );
-    const started = await startDemoStream(client, req.user.sub, amount);
+    // Do not start the demo stream yet. An admin must confirm this deposit request first.
     await client.query('COMMIT');
     res.status(201).json({
       ok:true,
       transaction:result.rows[0],
-      demo:{started,active:true},
-      message:"Deposit request submitted. Your demo credits and debits will arrive one by one."
+      demo:{started:false,active:false,pendingApproval:true},
+      message:"Deposit request submitted. Waiting for admin confirmation."
     });
   } catch (e) {
     try { await client.query('ROLLBACK'); } catch {}
     console.error(e);
     res.status(500).json({ ok:false, message:"Could not create deposit request." });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/admin/deposits", auth, adminOnly, async (_req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(`
+      SELECT t.id,t.user_id,t.amount,t.status,t.reference,t.utr,t.created_at,
+             u.name AS user_name,u.email AS user_email
+      FROM transactions t
+      JOIN users u ON u.id=t.user_id
+      WHERE t.type='deposit' AND t.status='pending'
+      ORDER BY t.created_at ASC
+      LIMIT 100
+    `);
+    res.json({ok:true,deposits:result.rows});
+  } catch(e) {
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not load pending deposits."});
+  }
+});
+
+app.post("/api/admin/deposits/:id/confirm", auth, adminOnly, requireSameOrigin, async (req,res)=>{
+  if (!requireDb(res)) return;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`
+      SELECT id,user_id,amount,status,reference,utr
+      FROM transactions
+      WHERE id=$1 AND type='deposit'
+      FOR UPDATE
+    `,[req.params.id]);
+    if(!result.rowCount){
+      await client.query('ROLLBACK');
+      return res.status(404).json({ok:false,message:"Deposit request not found."});
+    }
+    const deposit=result.rows[0];
+    if(deposit.status !== 'pending'){
+      await client.query('ROLLBACK');
+      return res.status(409).json({ok:false,message:"This deposit has already been processed."});
+    }
+
+    await client.query(`UPDATE transactions SET status='approved' WHERE id=$1`,[deposit.id]);
+    const started=await startDemoStream(client,deposit.user_id,deposit.amount);
+    await client.query('COMMIT');
+    res.json({
+      ok:true,
+      deposit:{...deposit,status:'approved'},
+      demo:{started,active:true},
+      message:"Deposit confirmed. Transaction activity can now start."
+    });
+  } catch(e) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error(e);
+    res.status(500).json({ok:false,message:"Could not confirm the deposit."});
   } finally {
     client.release();
   }
@@ -638,10 +757,93 @@ app.post("/api/withdrawals", auth, requireSameOrigin, async (req, res) => {
   webhooks, an auditable ledger, and appropriate compliance controls.
 */
 
+app.get("/api/kyc", auth, async (req,res)=>{
+  if(!requireDb(res)) return;
+  try{
+    const result=await pool.query(`SELECT status,created_at,updated_at,
+      (aadhaar_front IS NOT NULL) AS aadhaar_front_uploaded,
+      (aadhaar_back IS NOT NULL) AS aadhaar_back_uploaded,
+      (pan IS NOT NULL) AS pan_uploaded
+      FROM user_kyc_documents WHERE user_id=$1`,[req.user.sub]);
+    res.json({ok:true,kyc:result.rows[0]||{status:'not_submitted',aadhaar_front_uploaded:false,aadhaar_back_uploaded:false,pan_uploaded:false}});
+  }catch(e){ console.error(e); res.status(500).json({ok:false,message:'Could not load KYC status.'}); }
+});
+
+app.post("/api/kyc", auth, requireSameOrigin, async (req,res)=>{
+  if(!requireDb(res)) return;
+  const body=req.body||{};
+  const front=decodeKycFile(body.aadhaar_front);
+  const back=decodeKycFile(body.aadhaar_back);
+  const pan=decodeKycFile(body.pan);
+  if(!front || !back || !pan){
+    return res.status(400).json({ok:false,message:'Upload Aadhaar front, Aadhaar back and PAN as JPG, PNG, WebP or PDF files (max 4 MB each).'});
+  }
+  try{
+    await pool.query(`
+      INSERT INTO user_kyc_documents(user_id,aadhaar_front,aadhaar_front_mime,aadhaar_back,aadhaar_back_mime,pan,pan_mime,status,created_at,updated_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,'pending',COALESCE((SELECT created_at FROM user_kyc_documents WHERE user_id=$1),NOW()),NOW())
+      ON CONFLICT(user_id) DO UPDATE SET
+        aadhaar_front=EXCLUDED.aadhaar_front,aadhaar_front_mime=EXCLUDED.aadhaar_front_mime,
+        aadhaar_back=EXCLUDED.aadhaar_back,aadhaar_back_mime=EXCLUDED.aadhaar_back_mime,
+        pan=EXCLUDED.pan,pan_mime=EXCLUDED.pan_mime,status='pending',updated_at=NOW()
+    `,[req.user.sub,front.buffer,front.mime,back.buffer,back.mime,pan.buffer,pan.mime]);
+    await pool.query(`UPDATE users SET kyc_status='pending',updated_at=NOW() WHERE id=$1`,[req.user.sub]);
+    res.status(201).json({ok:true,message:'KYC documents submitted for admin review.'});
+  }catch(e){ console.error(e); res.status(500).json({ok:false,message:'Could not save KYC documents.'}); }
+});
+
+app.get("/api/admin/kyc", auth, adminOnly, async (_req,res)=>{
+  if(!requireDb(res)) return;
+  try{
+    const result=await pool.query(`
+      SELECT u.id,u.public_user_id,u.name,u.email,u.kyc_status,u.created_at,
+        k.status AS document_status,
+        (k.aadhaar_front IS NOT NULL) AS aadhaar_front_uploaded,
+        (k.aadhaar_back IS NOT NULL) AS aadhaar_back_uploaded,
+        (k.pan IS NOT NULL) AS pan_uploaded,
+        k.updated_at AS kyc_updated_at
+      FROM users u LEFT JOIN user_kyc_documents k ON k.user_id=u.id
+      ORDER BY u.created_at DESC LIMIT 500
+    `);
+    res.json({ok:true,users:result.rows});
+  }catch(e){ console.error(e); res.status(500).json({ok:false,message:'Could not load KYC records.'}); }
+});
+
+app.get("/api/admin/kyc/:userId", auth, adminOnly, async (req,res)=>{
+  if(!requireDb(res)) return;
+  try{
+    const result=await pool.query(`
+      SELECT u.id,u.public_user_id,u.name,u.email,u.kyc_status,
+        k.status,k.created_at,k.updated_at,k.aadhaar_front,k.aadhaar_front_mime,k.aadhaar_back,k.aadhaar_back_mime,k.pan,k.pan_mime
+      FROM users u LEFT JOIN user_kyc_documents k ON k.user_id=u.id WHERE u.id=$1
+    `,[req.params.userId]);
+    if(!result.rowCount) return res.status(404).json({ok:false,message:'User not found.'});
+    const x=result.rows[0];
+    res.json({ok:true,user:{id:x.id,public_user_id:x.public_user_id,name:x.name,email:x.email,kyc_status:x.kyc_status},kyc:x.status?{
+      status:x.status,created_at:x.created_at,updated_at:x.updated_at,
+      aadhaar_front:dataUrlFromKyc(x.aadhaar_front,x.aadhaar_front_mime),
+      aadhaar_back:dataUrlFromKyc(x.aadhaar_back,x.aadhaar_back_mime),
+      pan:dataUrlFromKyc(x.pan,x.pan_mime)
+    }:null});
+  }catch(e){ console.error(e); res.status(500).json({ok:false,message:'Could not load KYC documents.'}); }
+});
+
+app.post("/api/admin/kyc/:userId/status", auth, adminOnly, requireSameOrigin, async (req,res)=>{
+  if(!requireDb(res)) return;
+  const status=String(req.body?.status||'').toLowerCase();
+  if(!['approved','rejected','pending'].includes(status)) return res.status(400).json({ok:false,message:'Invalid KYC status.'});
+  try{
+    const result=await pool.query(`UPDATE user_kyc_documents SET status=$1,updated_at=NOW() WHERE user_id=$2 RETURNING user_id`,[status,req.params.userId]);
+    if(!result.rowCount) return res.status(404).json({ok:false,message:'KYC documents not found.'});
+    await pool.query(`UPDATE users SET kyc_status=$1,updated_at=NOW() WHERE id=$2`,[status,req.params.userId]);
+    res.json({ok:true,message:`KYC marked ${status}.`});
+  }catch(e){ console.error(e); res.status(500).json({ok:false,message:'Could not update KYC status.'}); }
+});
+
 app.get("/api/admin/users", auth, adminOnly, async (req, res) => {
   if (!requireDb(res)) return;
   const result = await pool.query(
-    `SELECT id,name,email,role,status,kyc_status,wallet_balance,created_at
+    `SELECT id,public_user_id,name,email,role,status,kyc_status,wallet_balance,created_at
      FROM users ORDER BY created_at DESC LIMIT 500`
   );
   res.json({ ok:true, users:result.rows });
@@ -655,6 +857,7 @@ app.use((_req, res) => {
   try{
     await ensurePaymentSettings();
     await ensureDemoTables();
+    await ensureUserProfileAndKycTables();
     await ensureDemoStreamTable();
     await ensureAdminAccount();
   } catch(e){

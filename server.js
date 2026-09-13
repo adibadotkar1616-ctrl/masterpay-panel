@@ -162,6 +162,17 @@ app.get("/api/transactions", auth, async (req, res) => {
   res.json({ ok:true, transactions:result.rows });
 });
 
+function requireSameOrigin(req, res, next) {
+  const origin = req.get("origin");
+  if (origin) {
+    const expected = `${req.protocol}://${req.get("host")}`;
+    if (origin !== expected) {
+      return res.status(403).json({ ok:false, message:"Invalid request origin." });
+    }
+  }
+  next();
+}
+
 app.get("/api/banks", auth, async (req, res) => {
   if (!requireDb(res)) return;
   const result = await pool.query(
@@ -172,11 +183,102 @@ app.get("/api/banks", auth, async (req, res) => {
   res.json({ ok:true, banks:result.rows });
 });
 
+app.post("/api/banks", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  const { bank_name, account_holder, account_number } = req.body || {};
+  const bankName = String(bank_name || "").trim();
+  const holder = String(account_holder || "").trim();
+  const accountNumber = String(account_number || "").replace(/\s+/g, "");
+  if (!bankName || bankName.length > 120 || !holder || holder.length > 120 || !/^\d{6,24}$/.test(accountNumber)) {
+    return res.status(400).json({ ok:false, message:"Enter a valid bank name, account holder and 6–24 digit account number." });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO bank_accounts(user_id,bank_name,account_holder,account_last4,status)
+       VALUES($1,$2,$3,$4,'pending')
+       RETURNING id,bank_name,account_holder,account_last4,status,created_at`,
+      [req.user.sub, bankName, holder, accountNumber.slice(-4)]
+    );
+    res.status(201).json({ ok:true, bank:result.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not add bank account." });
+  }
+});
+
+app.delete("/api/banks/:id", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  try {
+    const result = await pool.query(
+      `DELETE FROM bank_accounts WHERE id=$1 AND user_id=$2 RETURNING id`,
+      [req.params.id, req.user.sub]
+    );
+    if (!result.rowCount) return res.status(404).json({ ok:false, message:"Bank account not found." });
+    res.json({ ok:true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not remove bank account." });
+  }
+});
+
+app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  const amount = Number(req.body?.amount);
+  if (!Number.isFinite(amount) || amount < 1 || amount > 1000000) {
+    return res.status(400).json({ ok:false, message:"Deposit amount must be between ₹1 and ₹10,00,000." });
+  }
+  try {
+    const reference = `DEP-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    const result = await pool.query(
+      `INSERT INTO transactions(user_id,type,amount,status,reference)
+       VALUES($1,'deposit',$2,'pending',$3)
+       RETURNING id,type,amount,status,reference,created_at`,
+      [req.user.sub, amount.toFixed(2), reference]
+    );
+    res.status(201).json({ ok:true, transaction:result.rows[0], message:"Deposit request created. Balance is unchanged until a verified payment provider confirms the payment." });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not create deposit request." });
+  }
+});
+
+app.post("/api/withdrawals", auth, requireSameOrigin, async (req, res) => {
+  if (!requireDb(res)) return;
+  const amount = Number(req.body?.amount);
+  const bankId = String(req.body?.bank_id || "");
+  if (!Number.isFinite(amount) || amount < 1 || amount > 1000000 || !bankId) {
+    return res.status(400).json({ ok:false, message:"Enter a valid withdrawal amount and bank account." });
+  }
+  try {
+    const bank = await pool.query(
+      `SELECT id FROM bank_accounts WHERE id=$1 AND user_id=$2 AND status='verified'`,
+      [bankId, req.user.sub]
+    );
+    if (!bank.rowCount) return res.status(400).json({ ok:false, message:"Select a verified bank account." });
+
+    const user = await pool.query(`SELECT wallet_balance FROM users WHERE id=$1`, [req.user.sub]);
+    const balance = Number(user.rows[0]?.wallet_balance || 0);
+    if (amount > balance) return res.status(400).json({ ok:false, message:"Insufficient available wallet balance." });
+
+    const reference = `WDR-${Date.now()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    const result = await pool.query(
+      `INSERT INTO transactions(user_id,type,amount,status,reference)
+       VALUES($1,'withdrawal',$2,'pending',$3)
+       RETURNING id,type,amount,status,reference,created_at`,
+      [req.user.sub, amount.toFixed(2), reference]
+    );
+    res.status(201).json({ ok:true, transaction:result.rows[0], message:"Withdrawal request created. Balance is unchanged until it is processed through the verified payment workflow." });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok:false, message:"Could not create withdrawal request." });
+  }
+});
+
 /*
   Financial safety boundary:
-  Deposit/withdrawal routes intentionally do NOT credit/debit balances.
-  Add a verified payment-provider webhook and an auditable server-side ledger
-  before enabling any real-money movement.
+  These routes create pending requests only. They do NOT credit/debit balances.
+  Real deposits/withdrawals require an authorized payment provider, verified
+  webhooks, an auditable ledger, and appropriate compliance controls.
 */
 
 app.get("/api/admin/users", auth, adminOnly, async (req, res) => {

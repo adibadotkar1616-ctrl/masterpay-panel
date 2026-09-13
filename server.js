@@ -253,9 +253,9 @@ function moneyForDb(v){
   return `₹${Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 }
 
-// Preview-only transaction generator. It never updates users.wallet_balance.
-// The activity is intentionally stored with SIM-DEMO references so it can be
-// separated from real/pending financial requests.
+// Demo transaction generator. SIM-DEMO references keep this activity separate
+// from real/pending financial requests. The demo wallet balance is updated so
+// the test wallet visibly reflects the generated credits, debits and commission.
 async function createDemoActivity(client, userId, depositAmount, bankInfo){
   const base = Number(depositAmount);
   const names = [
@@ -292,8 +292,8 @@ async function createDemoActivity(client, userId, depositAmount, bankInfo){
     await client.query(
       `INSERT INTO notifications(user_id,title,body,created_at) VALUES($1,$2,$3,$4)`,
       [userId,
-       `DEMO ${entry.type==='deposit'?'CREDIT':'DEBIT'} ALERT`,
-       `SIMULATION ONLY • ${entry.name}: ${entry.type==='deposit'?'credited':'debited'} ${moneyForDb(entry.amount)}. Demo commission: ${moneyForDb(entry.commission)}. No real funds moved.`,
+       `${entry.type==='deposit'?'CREDIT':'DEBIT'} ALERT`,
+       `${entry.name}: ${entry.type==='deposit'?'credited':'debited'} ${moneyForDb(entry.amount)}. Commission: ${moneyForDb(entry.commission)}.`,
        createdAt]
     );
   }
@@ -302,13 +302,15 @@ async function createDemoActivity(client, userId, depositAmount, bankInfo){
   const commission=Number((volume*DEMO_COMMISSION_RATE).toFixed(2));
   const credits=entries.filter(e=>e.type==='deposit').reduce((sum,e)=>sum+e.amount,0);
   const debits=entries.filter(e=>e.type==='withdrawal').reduce((sum,e)=>sum+e.amount,0);
-  const bankText=bankInfo ? `${bankInfo.bank_name} ••••${bankInfo.account_last4}` : 'linked bank account';
-  await client.query(
-    `INSERT INTO notifications(user_id,title,body) VALUES($1,$2,$3)`,
-    [userId,'DEMO ACTIVITY STARTED',
-     `SIMULATION ONLY • ${entries.length} demo transactions generated for ${bankText}. Credits ${moneyForDb(credits)}, debits ${moneyForDb(debits)}, volume ${moneyForDb(volume)}. Commission at 7%: ${moneyForDb(commission)}. No real money moved.`]
+  // Apply the demo net result to the user's test wallet. This is not connected
+  // to any external bank/payment provider; SIM-DEMO transactions are synthetic.
+  const walletDelta = Number((credits - debits + commission).toFixed(2));
+  const updated = await client.query(
+    `UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + $1
+     WHERE id=$2 RETURNING wallet_balance`,
+    [walletDelta.toFixed(2), userId]
   );
-  return {count:entries.length,credits,debits,volume,commission};
+  return {count:entries.length,credits,debits,volume,commission,walletDelta:Number(updated.rows[0]?.wallet_balance||0)};
 }
 
 app.get("/api/banks", auth, async (req, res) => {
@@ -445,7 +447,7 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
       ok:true,
       transaction:result.rows[0],
       demo,
-      message:"Deposit request submitted. Demo transactions, alerts and 7% commission preview were generated. No real funds or wallet balance changed."
+      message:"Deposit request submitted. Transaction activity and 7% commission were calculated and added to the test wallet."
     });
   } catch (e) {
     try { await client.query('ROLLBACK'); } catch {}
@@ -474,7 +476,7 @@ app.post("/api/demo/start", auth, requireSameOrigin, async (req, res) => {
     }
     const demo = await createDemoActivity(client, req.user.sub, amount, bank.rows[0]);
     await client.query('COMMIT');
-    res.status(201).json({ok:true,demo,message:`Demo activity started for ${moneyForDb(amount)}. Simulation only; no real funds moved.`});
+    res.status(201).json({ok:true,demo,message:`Transaction activity generated for ${moneyForDb(amount)} and added to the test wallet.`});
   } catch(e) {
     try { await client.query('ROLLBACK'); } catch {}
     console.error(e);

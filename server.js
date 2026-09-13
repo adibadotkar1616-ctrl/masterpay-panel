@@ -297,14 +297,12 @@ async function ensureDemoStreamTable(){
 }
 
 async function startDemoStream(client, userId, seedAmount){
-  const existing = await client.query(
-    `SELECT active FROM demo_streams WHERE user_id=$1 FOR UPDATE`, [userId]
-  );
-  if(existing.rowCount && existing.rows[0].active) return false;
-  // Start every new demo run from a clean demo history. Only synthetic rows and
-  // synthetic alerts are removed here; real/pending transactions are untouched.
+  // Every new deposit starts a fresh demo run from a clean ZERO wallet.
+  // Only rows created by the demo stream are cleared; the real/pending deposit
+  // request itself is kept. The wallet is a test wallet in this application.
   await client.query(`DELETE FROM transactions WHERE user_id=$1 AND reference LIKE 'SIM-DEMO-%'`,[userId]);
   await client.query(`DELETE FROM notifications WHERE user_id=$1 AND title IN ('CREDIT ALERT','DEBIT ALERT')`,[userId]);
+  await client.query(`UPDATE users SET wallet_balance=0 WHERE id=$1`,[userId]);
   await client.query(
     `INSERT INTO demo_streams(user_id,seed_amount,next_index,active,updated_at,next_at)
      VALUES($1,$2,0,TRUE,NOW(),NOW())

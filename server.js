@@ -53,7 +53,7 @@ async function ensureDemoTables(){
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (
       id BIGSERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       body TEXT NOT NULL,
       is_read BOOLEAN NOT NULL DEFAULT FALSE,
@@ -285,7 +285,7 @@ async function ensureDemoStreamTable(){
   if(!pool) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS demo_streams (
-      user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       seed_amount NUMERIC(14,2) NOT NULL,
       next_index INTEGER NOT NULL DEFAULT 0,
       active BOOLEAN NOT NULL DEFAULT TRUE,

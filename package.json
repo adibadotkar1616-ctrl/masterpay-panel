@@ -1,0 +1,18 @@
+{
+  "name": "masterpay-panel-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "MASTERPAY panel with PostgreSQL-ready authentication and admin foundation",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "dev": "node server.js" },
+  "engines": { "node": ">=20 <25" },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
+  }
+}

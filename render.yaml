@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: masterpay-panel
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+databases:
+  - name: masterpay-db
+    databaseName: masterpay
+    user: masterpay
+    plan: free

@@ -39,6 +39,7 @@ async function api(url, options={}){
 
 function renderUser(u){
   $("#welcome").textContent=`Welcome, ${u.name}`;
+  $("#pUserId").textContent=u.public_user_id||"—";
   $("#pName").textContent=u.name;
   $("#pEmail").textContent=u.email;
   $("#pRole").textContent=u.role;
@@ -83,6 +84,31 @@ function fillPaymentSettingsForm(s){
 
 async function loadAdminPaymentSettings(){
   try{const d=await api("/api/admin/payment-settings");fillPaymentSettingsForm(d.settings);}catch(e){$("#paymentSettingsMsg").textContent=e.message;}
+}
+
+async function loadAdminDeposits(){
+  const body=$("#adminDepositsBody");
+  const msgEl=$("#adminDepositMsg");
+  if(!body) return;
+  try{
+    const d=await api("/api/admin/deposits");
+    body.innerHTML=d.deposits.length ? d.deposits.map(x=>`<tr><td><b>${escapeHtml(x.user_name)}</b><small>${escapeHtml(x.user_email)}</small></td><td>${money(x.amount)}</td><td>${escapeHtml(x.utr||'—')}</td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td><td><button class="primary admin-confirm-deposit" type="button" data-deposit-id="${escapeHtml(x.id)}">Confirm Deposit</button></td></tr>`).join("") : `<tr><td colspan="5"><div class="empty-state"><b>No pending deposits</b><small>Confirmed deposits will start their demo transaction stream.</small></div></td></tr>`;
+    $$(".admin-confirm-deposit").forEach(btn=>btn.onclick=async()=>{
+      if(!confirm("Confirm this deposit and start the user's demo transaction stream?")) return;
+      btn.disabled=true;
+      if(msgEl) msgEl.textContent="Confirming deposit…";
+      try{
+        const r=await api(`/api/admin/deposits/${encodeURIComponent(btn.dataset.depositId)}/confirm`,{method:"POST",body:JSON.stringify({})});
+        if(msgEl) msgEl.textContent=r.message;
+        await loadAdminDeposits();
+      }catch(e){
+        btn.disabled=false;
+        if(msgEl) msgEl.textContent=e.message;
+      }
+    });
+  }catch(e){
+    body.innerHTML=`<tr><td colspan="5">${escapeHtml(e.message)}</td></tr>`;
+  }
 }
 
 function demoType(x){
@@ -144,8 +170,95 @@ async function loadNotifications(showToast=true){
   }catch(e){console.error(e);}
 }
 
+async function loadKyc(){
+  const msgEl=$("#kycMsg");
+  try{
+    const d=await api("/api/kyc");
+    const k=d.kyc||{};
+    $("#kycStatus").textContent=k.status||"not_submitted";
+  }catch(e){ if(msgEl) msgEl.textContent=e.message; }
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    if(!file) return reject(new Error("Please select all three KYC documents."));
+    if(file.size>4*1024*1024) return reject(new Error(`${file.name} is larger than 4 MB.`));
+    const allowed=["image/jpeg","image/png","image/webp","application/pdf"];
+    if(!allowed.includes(file.type)) return reject(new Error(`${file.name}: use JPG, PNG, WebP or PDF.`));
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error(`Could not read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+$("#kycForm")?.addEventListener("submit",async(e)=>{
+  e.preventDefault();
+  const msgEl=$("#kycMsg");
+  msgEl.textContent="Preparing KYC documents…";
+  try{
+    const front=await fileToDataUrl($("#aadhaarFront")?.files?.[0]);
+    const back=await fileToDataUrl($("#aadhaarBack")?.files?.[0]);
+    const pan=await fileToDataUrl($("#panCard")?.files?.[0]);
+    msgEl.textContent="Submitting KYC for admin review…";
+    const d=await api("/api/kyc",{method:"POST",body:JSON.stringify({aadhaar_front:front,aadhaar_back:back,pan})});
+    msgEl.textContent=d.message;
+    e.target.reset();
+    await loadKyc();
+    await loadData();
+  }catch(err){ msgEl.textContent=err.message; }
+});
+
+function renderAdminKycFile(targetId,dataUrl,label){
+  const el=$(targetId); if(!el) return;
+  if(!dataUrl){ el.innerHTML=`<div class="empty-state"><b>${label} not uploaded</b></div>`; return; }
+  const isPdf=String(dataUrl).startsWith("data:application/pdf");
+  el.innerHTML=isPdf ? `<a class="kyc-file-link" href="${dataUrl}" target="_blank" rel="noopener">Open ${label} PDF</a>` : `<a href="${dataUrl}" target="_blank" rel="noopener"><img class="kyc-preview" src="${dataUrl}" alt="${escapeHtml(label)}"/></a>`;
+}
+
+let currentAdminKycUserId="";
+async function loadAdminKyc(){
+  const body=$("#usersBody"); if(!body) return;
+  try{
+    const d=await api("/api/admin/kyc");
+    body.innerHTML=d.users.map(x=>{
+      const docs=[x.aadhaar_front_uploaded?"Front":"",x.aadhaar_back_uploaded?"Back":"",x.pan_uploaded?"PAN":""].filter(Boolean).join(" + ")||"None";
+      const status=x.document_status||x.kyc_status||"not submitted";
+      return `<tr><td><b>${escapeHtml(x.public_user_id||"—")}</b></td><td><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.email)}</small></td><td>${escapeHtml(status)}</td><td>${escapeHtml(docs)}</td><td><button class="primary admin-view-kyc" type="button" data-user-id="${escapeHtml(x.id)}">View KYC</button></td></tr>`;
+    }).join("")||`<tr><td colspan="5">No users found.</td></tr>`;
+    $$(".admin-view-kyc").forEach(btn=>btn.onclick=()=>viewAdminKyc(btn.dataset.userId));
+  }catch(e){ body.innerHTML=`<tr><td colspan="5">${escapeHtml(e.message)}</td></tr>`; }
+}
+
+async function viewAdminKyc(userId){
+  const viewer=$("#adminKycViewer");
+  const msgEl=$("#adminKycMsg");
+  currentAdminKycUserId=userId;
+  try{
+    const d=await api(`/api/admin/kyc/${encodeURIComponent(userId)}`);
+    $("#adminKycViewerTitle").textContent=`${d.user.public_user_id||"—"} · ${d.user.name}`;
+    $("#adminKycViewerMeta").textContent=`${d.user.email} · KYC status: ${d.kyc?.status||d.user.kyc_status||"not submitted"}`;
+    renderAdminKycFile("#adminAadhaarFront",d.kyc?.aadhaar_front,"Aadhaar Front");
+    renderAdminKycFile("#adminAadhaarBack",d.kyc?.aadhaar_back,"Aadhaar Back");
+    renderAdminKycFile("#adminPan",d.kyc?.pan,"PAN");
+    viewer?.classList.remove("hidden");
+    viewer?.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){ if(msgEl) msgEl.textContent=e.message; }
+}
+
+$("#closeAdminKyc")?.addEventListener("click",()=>$("#adminKycViewer")?.classList.add("hidden"));
+async function setAdminKycStatus(status){
+  if(!currentAdminKycUserId) return;
+  const msgEl=$("#adminKycMsg");
+  try{ const d=await api(`/api/admin/kyc/${encodeURIComponent(currentAdminKycUserId)}/status`,{method:"POST",body:JSON.stringify({status})}); if(msgEl) msgEl.textContent=d.message; await loadAdminKyc(); await viewAdminKyc(currentAdminKycUserId); }
+  catch(e){ if(msgEl) msgEl.textContent=e.message; }
+}
+$("#approveKyc")?.addEventListener("click",()=>setAdminKycStatus("approved"));
+$("#rejectKyc")?.addEventListener("click",()=>setAdminKycStatus("rejected"));
+
 async function loadData(){
   const me=await api("/api/me"); renderUser(me.user);
+  await loadKyc();
   await loadPaymentSettings();
   try{
     const b=await api("/api/banks");
@@ -172,10 +285,8 @@ async function loadData(){
   await loadNotifications();
   if(me.user.role==="admin"){
     await loadAdminPaymentSettings();
-    try{
-      const a=await api("/api/admin/users");
-      $("#usersBody").innerHTML=a.users.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.email)}</td><td>${escapeHtml(x.role)}</td><td>${escapeHtml(x.kyc_status)}</td><td>${escapeHtml(x.status)}</td></tr>`).join("");
-    }catch(e){$("#usersBody").innerHTML=`<tr><td colspan="5">${escapeHtml(e.message)}</td></tr>`}
+    await loadAdminDeposits();
+    await loadAdminKyc();
   }
 }
 
@@ -288,6 +399,9 @@ async function refreshDemoUi(){
   finally{ demoPollingBusy=false; }
 }
 
+
+$("#refreshAdminDeposits")?.addEventListener("click",loadAdminDeposits);
+$("#refreshAdminKyc")?.addEventListener("click",loadAdminKyc);
 
 $("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); location.reload(); };
 

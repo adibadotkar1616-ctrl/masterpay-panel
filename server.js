@@ -8,6 +8,9 @@ const { Pool } = require("pg");
 const path = require("path");
 
 const app = express();
+// Render terminates HTTPS at its proxy. Trust the proxy so req.protocol
+// correctly reflects the original HTTPS request used by the browser.
+app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT || 10000);
 const JWT_SECRET = process.env.JWT_SECRET || "CHANGE_ME_IN_PRODUCTION";
 

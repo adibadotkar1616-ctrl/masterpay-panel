@@ -10,7 +10,10 @@
 <body>
 <div class="app">
   <header class="topbar">
-    <a class="brand" href="#" aria-label="MASTERPAY home"><img src="/assets/masterpay-logo.png" class="logo" alt="MASTERPAY"></a>
+    <div class="header-left">
+      <button id="menuToggle" class="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+      <a class="brand" href="#" aria-label="MASTERPAY home"><img src="/assets/masterpay-logo.png" class="logo" alt="MASTERPAY"></a>
+    </div>
     <div class="top-right"><span id="clock"></span><button id="logout" class="ghost hidden">Logout</button></div>
   </header>
 
@@ -36,7 +39,7 @@
   </div>
 
   <div id="panelView" class="hidden">
-    <nav class="nav" aria-label="Main navigation">
+    <nav id="sideNav" class="nav" aria-label="Main navigation">
       <button data-view="dashboard" class="nav-btn active"><span>⌂</span> Home</button>
       <button data-view="profile" class="nav-btn"><span>◎</span> Profile</button>
       <button data-view="kyc" class="nav-btn"><span>✓</span> KYC</button>
@@ -48,6 +51,7 @@
       <button data-view="security" class="nav-btn"><span>⌑</span> Security</button>
       <button data-view="admin" id="adminNav" class="nav-btn hidden"><span>⚙</span> Admin</button>
     </nav>
+    <div id="navOverlay" class="nav-overlay" aria-hidden="true"></div>
 
     <main>
       <section id="dashboard" class="view active">
@@ -139,10 +143,10 @@
                   <div><span class="card-kicker">BANK TRANSFER</span><h4>Transfer to bank account</h4><p>Send exactly the selected plan amount.</p></div>
                 </div>
                 <div class="payment-details">
-                  <div class="payment-row"><span>Bank name</span><b>Bank of India</b></div>
-                  <div class="payment-row"><span>Account holder</span><b>Rohit Nagar</b></div>
-                  <div class="payment-row"><span>Account number</span><b>992618210001746</b><button type="button" class="copy-btn" data-copy="992618210001746">Copy</button></div>
-                  <div class="payment-row"><span>IFSC code</span><b>BKID0008856</b><button type="button" class="copy-btn" data-copy="BKID0008856">Copy</button></div>
+                  <div class="payment-row"><span>Bank name</span><b id="paymentBankName">Bank of India</b></div>
+                  <div class="payment-row"><span>Account holder</span><b id="paymentAccountHolder">Rohit Nagar</b></div>
+                  <div class="payment-row"><span>Account number</span><b id="paymentAccountNumber">992618210001746</b><button type="button" class="copy-btn" id="copyAccountNumber" data-copy="992618210001746">Copy</button></div>
+                  <div class="payment-row"><span>IFSC code</span><b id="paymentIfsc">BKID0008856</b><button type="button" class="copy-btn" id="copyIfsc" data-copy="BKID0008856">Copy</button></div>
                 </div>
               </section>
 
@@ -153,12 +157,12 @@
                 </div>
                 <div class="upi-layout">
                   <div class="qr-box">
-                    <img src="/assets/upi-qr.jpeg" alt="MASTERPAY UPI QR code">
-                    <span>ROHIT NARAYANSINGH</span>
+                    <img id="paymentQr" src="/assets/upi-qr.jpeg" alt="MASTERPAY UPI QR code">
+                    <span id="paymentQrName">ROHIT NARAYANSINGH</span>
                   </div>
                   <div class="upi-info">
-                    <div class="upi-id-row"><div><small>UPI ID</small><b>rohitnagar3870@ibl</b></div><button type="button" class="copy-btn" data-copy="rohitnagar3870@ibl">Copy</button></div>
-                    <div class="upi-id-row"><div><small>UPI name</small><b>ROHIT NARAYANSINGH</b></div></div>
+                    <div class="upi-id-row"><div><small>UPI ID</small><b id="paymentUpiId">rohitnagar3870@ibl</b></div><button type="button" class="copy-btn" id="copyUpi" data-copy="rohitnagar3870@ibl">Copy</button></div>
+                    <div class="upi-id-row"><div><small>UPI name</small><b id="paymentUpiName">ROHIT NARAYANSINGH</b></div></div>
                     <div class="payment-tip"><b>Before you pay</b><span>Use the exact deposit amount shown above and verify the recipient name in your UPI app.</span></div>
                   </div>
                 </div>
@@ -193,7 +197,24 @@
 
       <section id="security" class="view"><div class="panel"><span class="eyebrow">SECURITY</span><h2>Security</h2><p class="muted">Basic account-security information.</p><div class="security-list"><div><b>Session</b><span>HTTP-only authentication cookie</span></div><div><b>Password</b><span>Stored as a server-side hash</span></div><div><b>Transport</b><span>Use HTTPS in production</span></div></div><div class="notice">Never share your password, database credentials, JWT secret, or payment credentials.</div></div></section>
 
-      <section id="admin" class="view"><div class="panel"><h2>Admin</h2><p class="muted">Admin foundation — read-only user list.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div></section>
+      <section id="admin" class="view">
+        <div class="panel admin-panel">
+          <div class="panel-title"><div><span class="eyebrow">ADMIN CONTROL</span><h2>Payment Settings</h2><p class="muted">Change the bank account, UPI details and QR image shown to users on the Deposit page.</p></div><span class="admin-badge">ADMIN ONLY</span></div>
+          <form id="paymentSettingsForm" class="payment-settings-form">
+            <div class="settings-grid">
+              <label>Bank name<input name="bank_name" id="settingBankName" maxlength="120" required></label>
+              <label>Account holder<input name="account_holder" id="settingAccountHolder" maxlength="120" required></label>
+              <label>Account number<input name="account_number" id="settingAccountNumber" inputmode="numeric" maxlength="24" required></label>
+              <label>IFSC code<input name="ifsc_code" id="settingIfsc" maxlength="11" required></label>
+              <label>UPI ID<input name="upi_id" id="settingUpiId" maxlength="180" required></label>
+              <label>UPI name<input name="upi_name" id="settingUpiName" maxlength="120" required></label>
+              <label class="full">QR image URL<input name="qr_image_url" id="settingQrUrl" maxlength="200000" placeholder="/assets/upi-qr.jpeg" required><small>Use a public image URL or a project path such as /assets/upi-qr.jpeg. You can replace the QR file in GitHub later.</small></label>
+            </div>
+            <div class="settings-preview"><div><span class="card-kicker">QR PREVIEW</span><img id="settingQrPreview" src="/assets/upi-qr.jpeg" alt="QR preview"></div><div class="settings-actions"><button class="deposit-submit" type="submit">Save Payment Settings</button><div id="paymentSettingsMsg" class="msg"></div></div></div>
+          </form>
+        </div>
+        <div class="panel admin-users-panel"><div class="panel-title"><div><span class="eyebrow">USERS</span><h3>Registered Users</h3></div></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div>
+      </section>
     </main>
   </div>
 

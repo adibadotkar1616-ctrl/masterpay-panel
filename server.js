@@ -47,6 +47,30 @@ async function ensurePaymentSettings(){
   await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS utr TEXT`);
 }
 
+async function ensureAdminAccount(){
+  if(!pool) return;
+  const email=String(process.env.ADMIN_EMAIL||"").trim().toLowerCase();
+  const password=String(process.env.ADMIN_PASSWORD||"");
+  const name=String(process.env.ADMIN_NAME||"MASTERPAY Admin").trim()||"MASTERPAY Admin";
+  if(!email && !password) return;
+  if(!email || !password || password.length < 8){
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required; ADMIN_PASSWORD must be at least 8 characters.");
+  }
+  const hash=await bcrypt.hash(password,12);
+  const existing=await pool.query("SELECT id FROM users WHERE email=$1",[email]);
+  if(existing.rowCount){
+    await pool.query(
+      "UPDATE users SET name=$1,password_hash=$2,role='admin',status='active',updated_at=NOW() WHERE email=$3",
+      [name,hash,email]
+    );
+  }else{
+    await pool.query(
+      "INSERT INTO users(name,email,password_hash,role,status) VALUES($1,$2,$3,'admin','active')",
+      [name,email,hash]
+    );
+  }
+}
+
 const defaultPaymentSettings = {
   bank_name:'Bank of India', account_holder:'Rohit Nagar', account_number:'992618210001746',
   ifsc_code:'BKID0008856', upi_id:'rohitnagar3870@ibl', upi_name:'ROHIT NARAYANSINGH',
@@ -385,7 +409,12 @@ app.use((_req, res) => {
 });
 
 (async()=>{
-  try{ await ensurePaymentSettings(); }
-  catch(e){ console.error("Payment settings initialization failed",e); process.exit(1); }
+  try{
+    await ensurePaymentSettings();
+    await ensureAdminAccount();
+  } catch(e){
+    console.error("Startup initialization failed:",e.message);
+    process.exit(1);
+  }
   app.listen(PORT, "0.0.0.0", () => console.log(`MASTERPAY listening on ${PORT}`));
 })();

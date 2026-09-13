@@ -86,52 +86,103 @@
 
       <section id="kyc" class="view"><div class="panel"><span class="eyebrow">VERIFICATION</span><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice"><b>KYC workflow</b><br>Production identity verification should use a compliant KYC provider. This version intentionally does not collect identity documents directly.</div></div></section>
 
-      <section id="wallet" class="view"><div class="panel wallet-page"><span class="eyebrow">WALLET</span><h2>Your Wallet</h2><div class="big" id="walletBalance">₹0.00</div><span class="sub">Available server-side balance</span><div class="wallet-actions"><button class="primary" type="button" id="openBankFromWallet">＋ Add Account</button><button class="primary" type="button" id="openDeposit">＋ Deposit</button><button class="secondary" type="button" id="openWithdraw">↗ Withdraw</button></div><div id="walletMsg" class="msg"></div></div><div class="wallet-forms"><div class="panel form-panel hidden" id="depositPanel"><div class="panel-title"><div><span class="eyebrow">ADD FUNDS</span><h3>Deposit Plan</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="depositForm" class="deposit-form">
-  <label>Select deposit plan
-    <select name="amount" id="depositPlan" required>
-      <option value="">Select a plan</option>
-      <option value="3000">Savings — ₹3,000</option>
-      <option value="10000">Current — ₹10,000</option>
-      <option value="50000">Corporate — ₹50,000</option>
-    </select>
-  </label>
+      <section id="wallet" class="view">
+        <div class="panel wallet-page">
+          <span class="eyebrow">WALLET</span>
+          <h2>Your Wallet</h2>
+          <div class="big" id="walletBalance">₹0.00</div>
+          <span class="sub">Available server-side balance</span>
+          <div class="wallet-actions">
+            <button class="primary" type="button" id="openBankFromWallet">＋ Add Account</button>
+            <button class="primary" type="button" id="openDeposit">＋ Deposit</button>
+            <button class="secondary" type="button" id="openWithdraw">↗ Withdraw</button>
+          </div>
+          <div id="walletMsg" class="msg"></div>
+        </div>
 
-  <div id="paymentDetails" class="payment-details hidden">
-    <div class="selected-amount">
-      <span>Amount to transfer</span>
-      <strong id="selectedDepositAmount">₹0.00</strong>
-    </div>
+        <div class="wallet-forms">
+          <div class="panel form-panel hidden deposit-shell" id="depositPanel">
+            <div class="deposit-heading">
+              <div>
+                <span class="eyebrow">ADD FUNDS</span>
+                <h3>Deposit Plan</h3>
+                <p class="muted">Select a plan, transfer the exact amount, then submit your UTR for verification.</p>
+              </div>
+              <button class="ghost close-form" type="button">Close</button>
+            </div>
 
-    <div class="payment-grid">
-      <div class="payment-card">
-        <div class="payment-card-title">🏦 Bank Transfer</div>
-        <div class="payment-line"><span>Bank</span><b>Bank of India</b></div>
-        <div class="payment-line"><span>Account holder</span><b>Rohit Nagar</b></div>
-        <div class="payment-line"><span>Account number</span><b>992618210001746</b></div>
-        <div class="payment-line"><span>IFSC</span><b>BKID0008856</b></div>
-      </div>
+            <form id="depositForm" class="deposit-form">
+              <section class="deposit-card plan-card">
+                <div class="deposit-card-head">
+                  <div class="deposit-icon">▤</div>
+                  <div><span class="card-kicker">PLAN</span><h4>Choose your deposit plan</h4></div>
+                </div>
+                <div class="plan-grid">
+                  <label class="plan-select-wrap">Select plan
+                    <select name="amount" id="depositPlan" required>
+                      <option value="">Select a plan</option>
+                      <option value="3000">Savings — ₹3,000</option>
+                      <option value="10000">Current — ₹10,000</option>
+                      <option value="50000">Corporate — ₹50,000</option>
+                    </select>
+                  </label>
+                  <div class="amount-display">
+                    <span>Deposit amount</span>
+                    <strong id="depositAmount">₹0.00</strong>
+                  </div>
+                </div>
+              </section>
 
-      <div class="payment-card upi-card">
-        <div class="payment-card-title">📱 UPI Payment</div>
-        <img src="/assets/upi-qr.jpeg" class="upi-qr" alt="UPI QR code for Rohit Narayansingh">
-        <div class="upi-name">ROHIT NARAYANSINGH</div>
-        <div class="upi-id">rohitnagar3870@ibl</div>
-        <small>Scan this QR or pay to the UPI ID above.</small>
-      </div>
-    </div>
+              <section class="deposit-card bank-payment-card">
+                <div class="deposit-card-head">
+                  <div class="deposit-icon bank-glow">⌂</div>
+                  <div><span class="card-kicker">BANK TRANSFER</span><h4>Transfer to bank account</h4><p>Send exactly the selected plan amount.</p></div>
+                </div>
+                <div class="payment-details">
+                  <div class="payment-row"><span>Bank name</span><b>Bank of India</b></div>
+                  <div class="payment-row"><span>Account holder</span><b>Rohit Nagar</b></div>
+                  <div class="payment-row"><span>Account number</span><b>992618210001746</b><button type="button" class="copy-btn" data-copy="992618210001746">Copy</button></div>
+                  <div class="payment-row"><span>IFSC code</span><b>BKID0008856</b><button type="button" class="copy-btn" data-copy="BKID0008856">Copy</button></div>
+                </div>
+              </section>
 
-    <div class="utr-box">
-      <label>UTR / Transaction ID
-        <input name="utr" id="depositUtr" type="text" maxlength="64" autocomplete="off" placeholder="Enter UTR after making the payment" required>
-      </label>
-      <small>Make the transfer first, then enter the UTR shown by your bank/UPI app.</small>
-    </div>
+              <section class="deposit-card upi-payment-card">
+                <div class="deposit-card-head">
+                  <div class="deposit-icon upi-glow">⌁</div>
+                  <div><span class="card-kicker">UPI PAYMENT</span><h4>Pay using UPI</h4><p>Scan the QR or use the UPI ID below.</p></div>
+                </div>
+                <div class="upi-layout">
+                  <div class="qr-box">
+                    <img src="/assets/upi-qr.jpeg" alt="MASTERPAY UPI QR code">
+                    <span>ROHIT NARAYANSINGH</span>
+                  </div>
+                  <div class="upi-info">
+                    <div class="upi-id-row"><div><small>UPI ID</small><b>rohitnagar3870@ibl</b></div><button type="button" class="copy-btn" data-copy="rohitnagar3870@ibl">Copy</button></div>
+                    <div class="upi-id-row"><div><small>UPI name</small><b>ROHIT NARAYANSINGH</b></div></div>
+                    <div class="payment-tip"><b>Before you pay</b><span>Use the exact deposit amount shown above and verify the recipient name in your UPI app.</span></div>
+                  </div>
+                </div>
+              </section>
 
-    <button class="primary" type="submit" id="submitDeposit">Submit Deposit Request</button>
-  </div>
-</form>
-<div class="notice">After selecting a plan, transfer the exact amount using the bank account or UPI shown above. Enter the UTR after payment. Your request stays <b>pending</b> until it is manually verified.</div></div><div class="panel form-panel hidden" id="withdrawPanel"><div class="panel-title"><div><span class="eyebrow">PAYOUT</span><h3>Withdrawal Request</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="withdrawForm" class="inline-form"><label>Amount (INR)<input name="amount" type="number" min="1" max="1000000" step="0.01" placeholder="500" required></label><label>Bind withdrawal bank<select name="bank_id" id="withdrawBank" required><option value="">Select a verified bank account</option></select></label><button class="primary" type="button" id="bindWithdrawalBank">＋ Bind Withdrawal Bank</button><button class="secondary" type="submit">Create Withdrawal Request</button></form><div class="notice">Bind a verified bank account before creating a withdrawal request. If you have not added a bank account, use the bind option above.</div></div></div></section>
+              <section class="deposit-card confirmation-card">
+                <div class="deposit-card-head">
+                  <div class="deposit-icon confirm-glow">✓</div>
+                  <div><span class="card-kicker">PAYMENT CONFIRMATION</span><h4>Enter your UTR</h4><p>After completing the transfer, enter the UTR / transaction ID.</p></div>
+                </div>
+                <label class="utr-label">UTR / Transaction ID
+                  <input name="utr" id="depositUtr" type="text" inputmode="text" autocomplete="off" maxlength="120" placeholder="Enter UTR after making the payment" required>
+                </label>
+                <div class="confirmation-actions">
+                  <div class="pending-note"><span>◷</span><span>Your request will be marked <b>Pending</b> until payment verification.</span></div>
+                  <button class="deposit-submit" type="submit">➤ Submit Deposit</button>
+                </div>
+              </section>
+            </form>
+          </div>
 
+          <div class="panel form-panel hidden" id="withdrawPanel"><div class="panel-title"><div><span class="eyebrow">PAYOUT</span><h3>Withdrawal Request</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="withdrawForm" class="inline-form"><label>Amount (INR)<input name="amount" type="number" min="1" max="1000000" step="0.01" placeholder="500" required></label><label>Bind withdrawal bank<select name="bank_id" id="withdrawBank" required><option value="">Select a verified bank account</option></select></label><button class="primary" type="button" id="bindWithdrawalBank">＋ Bind Withdrawal Bank</button><button class="secondary" type="submit">Create Withdrawal Request</button></form><div class="notice">Bind a verified bank account before creating a withdrawal request. If you have not added a bank account, use the bind option above.</div></div>
+        </div>
+      </section>
       <section id="banks" class="view"><div class="panel"><div class="panel-title"><div><span class="eyebrow">BANKING</span><h2>Bank Accounts</h2><p class="muted">Add and manage bank accounts for future verified payouts.</p></div><button class="primary" type="button" id="openBankForm">＋ Add Bank</button></div><div id="banksList" class="list">Loading…</div></div><div class="panel form-panel hidden" id="bankPanel"><div class="panel-title"><div><span class="eyebrow">NEW ACCOUNT</span><h3>Add Bank Account</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="bankForm" class="bank-form"><label>Select bank<select name="bank_name" id="bankName" required><option value="">Select your bank</option><optgroup label="Public Sector Banks"><option>State Bank of India</option><option>Bank of Baroda</option><option>Bank of India</option><option>Bank of Maharashtra</option><option>Canara Bank</option><option>Central Bank of India</option><option>Indian Bank</option><option>Indian Overseas Bank</option><option>Punjab National Bank</option><option>Punjab & Sind Bank</option><option>UCO Bank</option><option>Union Bank of India</option></optgroup><optgroup label="Private Sector Banks"><option>Axis Bank</option><option>Bandhan Bank</option><option>CSB Bank</option><option>City Union Bank</option><option>DCB Bank</option><option>Dhanlaxmi Bank</option><option>Federal Bank</option><option>HDFC Bank</option><option>ICICI Bank</option><option>IDBI Bank</option><option>IDFC FIRST Bank</option><option>IndusInd Bank</option><option>Jammu & Kashmir Bank</option><option>Karnataka Bank</option><option>Karur Vysya Bank</option><option>Kotak Mahindra Bank</option><option>RBL Bank</option><option>South Indian Bank</option><option>Tamilnad Mercantile Bank</option><option>Yes Bank</option></optgroup><optgroup label="Small Finance Banks"><option>AU Small Finance Bank</option><option>Capital Small Finance Bank</option><option>Equitas Small Finance Bank</option><option>ESAF Small Finance Bank</option><option>Jana Small Finance Bank</option><option>North East Small Finance Bank</option><option>Shivalik Small Finance Bank</option><option>Suryoday Small Finance Bank</option><option>Ujjivan Small Finance Bank</option><option>Unity Small Finance Bank</option><option>Utkarsh Small Finance Bank</option></optgroup><optgroup label="Payments Banks"><option>India Post Payments Bank</option><option>Fino Payments Bank</option><option>Jio Payments Bank</option><option>NSDL Payments Bank</option><option>Paytm Payments Bank</option></optgroup><optgroup label="Other Banks Operating in India"><option>DBS Bank India</option><option>HSBC India</option><option>Standard Chartered Bank India</option><option>Deutsche Bank India</option><option>Bank of America India</option><option>Barclays Bank India</option><option>BNP Paribas India</option><option>Citibank India</option><option>J.P. Morgan India</option><option>MUFG Bank India</option><option>Qatar National Bank India</option><option>Societe Generale India</option></optgroup></select></label><label>Account type<select name="account_type" required><option value="">Select account type</option><option value="savings">Savings</option><option value="current">Current</option><option value="corporate">Corporate</option></select></label><label>Account number<input name="account_number" inputmode="numeric" autocomplete="off" maxlength="24" placeholder="6–24 digits" required></label><label>IFSC code<input name="ifsc_code" maxlength="11" autocomplete="off" placeholder="e.g. SBIN0001234" style="text-transform:uppercase" required></label><label>Account holder name<input name="account_holder" maxlength="120" placeholder="Name on account" required></label><label>Mobile number<input name="mobile_number" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="10-digit mobile number" required></label><button class="primary" type="submit">Save Bank Account</button></form><div class="notice">For security, MASTERPAY stores only the last 4 digits in this starter. Use a verified banking/payment provider before using these details for real payouts.</div><div id="bankMsg" class="msg"></div></div></section>
 
       <section id="transactions" class="view"><div class="panel"><span class="eyebrow">ACTIVITY</span><h2>Transactions</h2><p class="muted">Your account transaction history.</p><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>

@@ -96,45 +96,29 @@ $("#bindWithdrawalBank")?.addEventListener("click",()=>$("#openBankFromWallet").
 $$('.close-form').forEach(b=>b.onclick=()=>b.closest('.form-panel')?.classList.add('hidden'));
 
 const depositPlan = $("#depositPlan");
-const paymentDetails = $("#paymentDetails");
-const selectedDepositAmount = $("#selectedDepositAmount");
+const depositAmount = $("#depositAmount");
+function updateDepositAmount(){
+  const amount=Number(depositPlan?.value||0);
+  if(depositAmount) depositAmount.textContent=money(amount);
+}
+depositPlan?.addEventListener("change",updateDepositAmount);
+updateDepositAmount();
 
-depositPlan?.addEventListener("change", () => {
-  const amount = Number(depositPlan.value);
-  if (Number.isFinite(amount) && amount > 0) {
-    selectedDepositAmount.textContent = money(amount);
-    paymentDetails.classList.remove("hidden");
-  } else {
-    selectedDepositAmount.textContent = "₹0.00";
-    paymentDetails.classList.add("hidden");
-  }
-});
+$$(".copy-btn").forEach(btn=>btn.addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(btn.dataset.copy||""); const old=btn.textContent; btn.textContent="Copied"; setTimeout(()=>btn.textContent=old,1200);}
+  catch(e){btn.textContent="Copy failed"; setTimeout(()=>btn.textContent="Copy",1200);}
+}));
 
 $("#depositForm")?.addEventListener("submit",async(e)=>{
   e.preventDefault();
-  $("#walletMsg").textContent="Submitting deposit request…";
   const body=Object.fromEntries(new FormData(e.target));
-  body.utr=String(body.utr||"").trim();
-
-  if(!body.amount || !body.utr){
-    $("#walletMsg").textContent="Select a plan and enter the UTR / Transaction ID.";
-    return;
-  }
-
-  const submit=$("#submitDeposit");
-  if(submit) submit.disabled=true;
-  try{
-    const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});
-    $("#walletMsg").textContent=d.message;
-    e.target.reset();
-    selectedDepositAmount.textContent="₹0.00";
-    paymentDetails.classList.add("hidden");
-    await loadData();
-  }catch(err){
-    $("#walletMsg").textContent=err.message;
-  }finally{
-    if(submit) submit.disabled=false;
-  }
+  const utr=String(body.utr||"").trim();
+  const amount=Number(body.amount);
+  if(!Number.isFinite(amount)||amount<=0){$("#walletMsg").textContent="Please select a deposit plan."; return;}
+  if(utr.length<6){$("#walletMsg").textContent="Enter a valid UTR / Transaction ID after making the payment."; $("#depositUtr")?.focus(); return;}
+  $("#walletMsg").textContent="Submitting deposit for verification…";
+  try{const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});$("#walletMsg").textContent=d.message; e.target.reset(); updateDepositAmount(); await loadData();}
+  catch(err){$("#walletMsg").textContent=err.message;}
 });
 
 $("#withdrawForm")?.addEventListener("submit",async(e)=>{

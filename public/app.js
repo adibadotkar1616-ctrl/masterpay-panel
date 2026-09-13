@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
 function money(v){ return new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(v||0)); }
+function escapeHtml(v){ return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 function msg(text){ $("#authMsg").textContent = text || ""; }
 
 function showView(id){
@@ -28,12 +29,15 @@ function renderUser(u){
   $("#pEmail").textContent=u.email;
   $("#pRole").textContent=u.role;
   $("#pJoined").textContent=new Date(u.created_at).toLocaleDateString("en-IN");
-  $("#walletBalance").textContent=money(u.wallet_balance);
-  $("#dashBalance").textContent=money(u.wallet_balance);
+  const bal=money(u.wallet_balance);
+  $("#walletBalance").textContent=bal;
+  $("#dashBalance").textContent=bal;
+  $("#dashBalance2").textContent=bal;
   $("#kycStatus").textContent=u.kyc_status;
   $("#dashKyc").textContent=u.kyc_status;
-  $("#kycCard").textContent=u.kyc_status;
+  $("#kycCard").textContent=u.kyc_status.replaceAll("_"," ");
   $("#dashStatus").textContent=u.status;
+  $("#statusDot").textContent=u.status;
   $("#authView").classList.add("hidden");
   $("#panelView").classList.remove("hidden");
   $("#logout").classList.remove("hidden");
@@ -44,17 +48,17 @@ async function loadData(){
   const me=await api("/api/me"); renderUser(me.user);
   try{
     const b=await api("/api/banks");
-    $("#banksList").innerHTML=b.banks.length?b.banks.map(x=>`<div class="notice">${x.bank_name} · ****${x.account_last4} · ${x.status}</div>`).join(""):"No bank accounts.";
+    $("#banksList").innerHTML=b.banks.length?b.banks.map(x=>`<div class="bank-row"><span class="bank-icon">▣</span><div><b>${escapeHtml(x.bank_name)}</b><small>Account ending ${escapeHtml(x.account_last4)}</small></div><em>${escapeHtml(x.status)}</em></div>`).join(""):"<div class='empty-state'><span>▣</span><b>No bank accounts</b><small>No saved bank records yet.</small></div>";
   }catch(e){$("#banksList").textContent=e.message}
   try{
     const t=await api("/api/transactions");
-    $("#txBody").innerHTML=t.transactions.length?t.transactions.map(x=>`<tr><td>${x.type}</td><td>${money(x.amount)}</td><td>${x.status}</td><td>${new Date(x.created_at).toLocaleString("en-IN")}</td></tr>`).join(""):`<tr><td colspan="4">No transactions.</td></tr>`;
-  }catch(e){$("#txBody").innerHTML=`<tr><td colspan="4">${e.message}</td></tr>`}
+    $("#txBody").innerHTML=t.transactions.length?t.transactions.map(x=>`<tr><td>${escapeHtml(x.type)}</td><td>${money(x.amount)}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`).join(""):`<tr><td colspan="4">No transactions.</td></tr>`;
+  }catch(e){$("#txBody").innerHTML=`<tr><td colspan="4">${escapeHtml(e.message)}</td></tr>`}
   if(me.user.role==="admin"){
     try{
       const a=await api("/api/admin/users");
-      $("#usersBody").innerHTML=a.users.map(x=>`<tr><td>${x.name}</td><td>${x.email}</td><td>${x.role}</td><td>${x.kyc_status}</td><td>${x.status}</td></tr>`).join("");
-    }catch(e){$("#usersBody").innerHTML=`<tr><td colspan="5">${e.message}</td></tr>`}
+      $("#usersBody").innerHTML=a.users.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.email)}</td><td>${escapeHtml(x.role)}</td><td>${escapeHtml(x.kyc_status)}</td><td>${escapeHtml(x.status)}</td></tr>`).join("");
+    }catch(e){$("#usersBody").innerHTML=`<tr><td colspan="5">${escapeHtml(e.message)}</td></tr>`}
   }
 }
 
@@ -72,12 +76,8 @@ $("#registerForm").addEventListener("submit",async(e)=>{
   catch(err){msg(err.message);}
 });
 
-$("#logout").onclick=async()=>{
-  await api("/api/auth/logout",{method:"POST"});
-  location.reload();
-};
+$("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); location.reload(); };
 
 function tick(){ $("#clock").textContent=new Date().toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}); }
 tick(); setInterval(tick,1000);
-
 api("/api/me").then(loadData).catch(()=>{});

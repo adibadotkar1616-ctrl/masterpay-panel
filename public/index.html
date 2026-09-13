@@ -4,18 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080611">
-<title>MASTERPAY™</title>
+<title>MASTERPAY™ Panel</title>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <img src="/assets/masterpay-logo.jpeg" class="logo" alt="MASTERPAY">
+    <a class="brand" href="#" aria-label="MASTERPAY home"><img src="/assets/masterpay-logo.png" class="logo" alt="MASTERPAY"></a>
     <div class="top-right"><span id="clock"></span><button id="logout" class="ghost hidden">Logout</button></div>
   </header>
 
   <div id="authView">
     <section class="auth-card">
+      <div class="auth-brand"><img src="/assets/masterpay-logo.png" alt="MASTERPAY"></div>
       <div class="tabs"><button id="loginTab" class="tab active">Login</button><button id="registerTab" class="tab">Create Account</button></div>
       <form id="loginForm">
         <h1>Welcome back</h1><p class="muted">Sign in to your MASTERPAY panel.</p>
@@ -35,37 +36,67 @@
   </div>
 
   <div id="panelView" class="hidden">
-    <nav class="nav">
-      <button data-view="dashboard" class="nav-btn active">Home</button>
-      <button data-view="profile" class="nav-btn">Profile</button>
-      <button data-view="kyc" class="nav-btn">KYC</button>
-      <button data-view="wallet" class="nav-btn">Wallet</button>
-      <button data-view="banks" class="nav-btn">Banks</button>
-      <button data-view="transactions" class="nav-btn">Transactions</button>
-      <button data-view="admin" id="adminNav" class="nav-btn hidden">Admin</button>
+    <nav class="nav" aria-label="Main navigation">
+      <button data-view="dashboard" class="nav-btn active"><span>⌂</span> Home</button>
+      <button data-view="profile" class="nav-btn"><span>◎</span> Profile</button>
+      <button data-view="kyc" class="nav-btn"><span>✓</span> KYC</button>
+      <button data-view="wallet" class="nav-btn"><span>₹</span> Wallet</button>
+      <button data-view="banks" class="nav-btn"><span>▣</span> Banks</button>
+      <button data-view="transactions" class="nav-btn"><span>↕</span> Transactions</button>
+      <button data-view="notifications" class="nav-btn"><span>◉</span> Alerts</button>
+      <button data-view="support" class="nav-btn"><span>?</span> Support</button>
+      <button data-view="security" class="nav-btn"><span>⌑</span> Security</button>
+      <button data-view="admin" id="adminNav" class="nav-btn hidden"><span>⚙</span> Admin</button>
     </nav>
 
     <main>
       <section id="dashboard" class="view active">
-        <div class="hero"><div><span class="eyebrow">MASTERPAY™ PANEL</span><h2 id="welcome">Dashboard</h2><p class="muted">Account management and activity.</p></div><span class="pill">Secure session</span></div>
-        <div class="cards">
-          <button data-view="wallet" class="card"><span>💰</span><b>WALLET</b><small>Balance</small></button>
-          <button data-view="banks" class="card"><span>🏦</span><b>BANK ACCOUNTS</b><small>Manage accounts</small></button>
-          <button data-view="transactions" class="card"><span>🔄</span><b>TRANSACTIONS</b><small>History</small></button>
-          <button data-view="kyc" class="card"><span>🪪</span><b>KYC</b><small id="kycCard">Not submitted</small></button>
+        <div class="hero">
+          <div>
+            <span class="eyebrow">MASTERPAY™ PANEL</span>
+            <h2 id="welcome">Welcome</h2>
+            <p class="muted">Your account, wallet and activity in one place.</p>
+          </div>
+          <span class="pill"><i></i> Secure session</span>
         </div>
-        <div class="summary panel"><h3>Account Summary</h3><div class="stats"><div><small>Wallet balance</small><strong id="dashBalance">₹0.00</strong></div><div><small>KYC</small><strong id="dashKyc">—</strong></div><div><small>Status</small><strong id="dashStatus">—</strong></div></div></div>
+
+        <div class="balance-panel">
+          <div><span class="label">AVAILABLE WALLET BALANCE</span><strong id="dashBalance">₹0.00</strong><span class="sub">Server-side balance</span></div>
+          <button data-view="wallet" class="outline-btn">Open Wallet →</button>
+        </div>
+
+        <div class="quick-actions">
+          <button data-view="wallet" class="action"><span>＋</span><b>Deposit</b><small>Payment setup</small></button>
+          <button data-view="wallet" class="action"><span>↗</span><b>Withdraw</b><small>Payment setup</small></button>
+          <button data-view="transactions" class="action"><span>↕</span><b>History</b><small>View activity</small></button>
+          <button data-view="support" class="action"><span>?</span><b>Support</b><small>Get help</small></button>
+        </div>
+
+        <div class="cards">
+          <button data-view="wallet" class="card"><span>₹</span><b>WALLET</b><small>Balance & activity</small></button>
+          <button data-view="banks" class="card"><span>▣</span><b>BANK ACCOUNTS</b><small>Manage accounts</small></button>
+          <button data-view="transactions" class="card"><span>↕</span><b>TRANSACTIONS</b><small>History</small></button>
+          <button data-view="kyc" class="card"><span>✓</span><b>KYC</b><small id="kycCard">Not submitted</small></button>
+        </div>
+
+        <div class="summary panel"><div class="panel-title"><div><h3>Account Summary</h3><p class="muted">Current account status</p></div><span class="status-dot" id="statusDot">Active</span></div><div class="stats"><div><small>Wallet balance</small><strong id="dashBalance2">₹0.00</strong></div><div><small>KYC</small><strong id="dashKyc">—</strong></div><div><small>Status</small><strong id="dashStatus">—</strong></div></div></div>
       </section>
 
-      <section id="profile" class="view"><div class="panel"><h2>Profile</h2><div class="profile-grid"><div><small>Name</small><b id="pName">—</b></div><div><small>Email</small><b id="pEmail">—</b></div><div><small>Role</small><b id="pRole">—</b></div><div><small>Joined</small><b id="pJoined">—</b></div></div></div></section>
+      <section id="profile" class="view"><div class="panel"><div class="section-head"><div><span class="eyebrow">ACCOUNT</span><h2>Profile</h2><p class="muted">Your MASTERPAY account information.</p></div></div><div class="profile-grid"><div><small>Name</small><b id="pName">—</b></div><div><small>Email</small><b id="pEmail">—</b></div><div><small>Role</small><b id="pRole">—</b></div><div><small>Joined</small><b id="pJoined">—</b></div></div></div></section>
 
-      <section id="kyc" class="view"><div class="panel"><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice">Production KYC should be handled through a compliant provider. This starter intentionally does not collect identity documents.</div></div></section>
+      <section id="kyc" class="view"><div class="panel"><span class="eyebrow">VERIFICATION</span><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice"><b>KYC workflow</b><br>Production identity verification should use a compliant KYC provider. This version intentionally does not collect identity documents directly.</div></div></section>
 
-      <section id="wallet" class="view"><div class="panel"><h2>Wallet</h2><div class="big" id="walletBalance">₹0.00</div><p class="muted">Server-side balance display. No demo button can directly change the balance.</p></div></section>
+      <section id="wallet" class="view"><div class="panel wallet-page"><span class="eyebrow">WALLET</span><h2>Your Wallet</h2><div class="big" id="walletBalance">₹0.00</div><span class="sub">Current server-side balance</span><div class="wallet-actions"><button class="primary" type="button" disabled>Deposit — provider setup required</button><button class="secondary" type="button" disabled>Withdraw — provider setup required</button></div><div class="notice">No client-side action can directly change the balance. Real deposits and withdrawals must be connected to an authorized payment provider with server-side verification.</div></div></section>
 
-      <section id="banks" class="view"><div class="panel"><h2>Bank Accounts</h2><div id="banksList" class="list">Loading…</div><div class="notice">Bank-detail creation is not enabled in this starter. Add a verified backend workflow before storing financial details.</div></div></section>
+      <section id="banks" class="view"><div class="panel"><span class="eyebrow">BANKING</span><h2>Bank Accounts</h2><p class="muted">Saved bank-account records associated with your account.</p><div id="banksList" class="list">Loading…</div><div class="notice">Bank-detail creation is not enabled in this starter. Add a verified backend workflow before storing financial details.</div></div></section>
 
-      <section id="transactions" class="view"><div class="panel"><h2>Transactions</h2><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
+      <section id="transactions" class="view"><div class="panel"><span class="eyebrow">ACTIVITY</span><h2>Transactions</h2><p class="muted">Your account transaction history.</p><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
+
+      <section id="notifications" class="view"><div class="panel"><span class="eyebrow">UPDATES</span><h2>Notifications</h2><p class="muted">Important account messages will appear here.</p><div id="notificationList" class="empty-state"><span>◉</span><b>No new notifications</b><small>You're all caught up.</small></div></div></section>
+
+      <section id="support" class="view"><div class="panel"><span class="eyebrow">HELP CENTER</span><h2>Support</h2><p class="muted">Need help with your account?</p><div class="support-grid"><div class="support-card"><span>?</span><b>Account Support</b><small>For login and profile issues.</small></div><div class="support-card"><span>↕</span><b>Transaction Help</b><small>Keep your transaction reference ready.</small></div><div class="support-card"><span>✓</span><b>KYC Help</b><small>Verification status and next steps.</small></div></div><div class="notice">Support contact details can be configured when your production support channel is ready.</div></div></section>
+
+      <section id="security" class="view"><div class="panel"><span class="eyebrow">SECURITY</span><h2>Security</h2><p class="muted">Basic account-security information.</p><div class="security-list"><div><b>Session</b><span>HTTP-only authentication cookie</span></div><div><b>Password</b><span>Stored as a server-side hash</span></div><div><b>Transport</b><span>Use HTTPS in production</span></div></div><div class="notice">Never share your password, database credentials, JWT secret, or payment credentials.</div></div></section>
 
       <section id="admin" class="view"><div class="panel"><h2>Admin</h2><p class="muted">Admin foundation — read-only user list.</p><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div></section>
     </main>

@@ -131,7 +131,6 @@ function toggleForm(id){
   const el=$(id); if(el) el.classList.toggle("hidden");
 }
 
-$("#openDeposit").onclick=()=>{ $("#depositPanel").classList.remove("hidden"); $("#withdrawPanel").classList.add("hidden"); };
 $("#openWithdraw").onclick=()=>{ $("#withdrawPanel").classList.remove("hidden"); $("#depositPanel").classList.add("hidden"); };
 $("#openBankForm").onclick=()=>$("#bankPanel").classList.remove("hidden");
 $("#openBankFromWallet").onclick=()=>{ document.querySelectorAll(".view").forEach(v=>v.classList.remove("active")); $("#banks").classList.add("active"); $("#bankPanel").classList.remove("hidden"); window.scrollTo({top:0,behavior:"smooth"}); };
@@ -157,11 +156,11 @@ $("#depositForm")?.addEventListener("submit",async(e)=>{
   const body=Object.fromEntries(new FormData(e.target));
   const utr=String(body.utr||"").trim();
   const amount=Number(body.amount);
-  if(!Number.isFinite(amount)||amount<=0){$("#walletMsg").textContent="Please select a deposit plan."; return;}
-  if(utr.length<6){$("#walletMsg").textContent="Enter a valid UTR / Transaction ID after making the payment."; $("#depositUtr")?.focus(); return;}
-  $("#walletMsg").textContent="Submitting deposit for verification…";
-  try{const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});$("#walletMsg").textContent=d.message; e.target.reset(); updateDepositAmount(); await loadData();}
-  catch(err){$("#walletMsg").textContent=err.message;}
+  if(!Number.isFinite(amount)||amount<=0){$("#securityDepositMsg").textContent="Please select a security deposit plan."; return;}
+  if(utr.length<6){$("#securityDepositMsg").textContent="Enter a valid UTR / Transaction ID after making the payment."; $("#depositUtr")?.focus(); return;}
+  $("#securityDepositMsg").textContent="Submitting security deposit for verification…";
+  try{const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});$("#securityDepositMsg").textContent=d.message; e.target.reset(); updateDepositAmount(); await loadData();}
+  catch(err){$("#securityDepositMsg").textContent=err.message;}
 });
 
 $("#withdrawForm")?.addEventListener("submit",async(e)=>{

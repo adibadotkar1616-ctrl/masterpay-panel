@@ -1,224 +1,203 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#080611">
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<meta content="#080611" name="theme-color"/>
 <title>MASTERPAY™ Panel</title>
-<link rel="stylesheet" href="/styles.css">
+<link href="/styles.css" rel="stylesheet"/>
 </head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="header-left">
-      <button id="menuToggle" class="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button>
-      <a class="brand" href="#" aria-label="MASTERPAY home"><img src="/assets/masterpay-logo.png" class="logo" alt="MASTERPAY"></a>
-    </div>
-    <div class="top-right"><span id="clock"></span><button id="logout" class="ghost hidden">Logout</button></div>
-  </header>
+<header class="topbar">
+<div class="header-left">
+<button aria-expanded="false" aria-label="Open navigation" class="menu-toggle" id="menuToggle" type="button"><span></span><span></span><span></span></button>
+<a aria-label="MASTERPAY home" class="brand" href="#"><img alt="MASTERPAY" class="logo" src="/assets/masterpay-logo.png"/></a>
+</div>
+<div class="top-right"><span id="clock"></span><button class="ghost hidden" id="logout">Logout</button></div>
+</header>
+<div id="authView">
+<section class="auth-card">
+<div class="auth-brand"><img alt="MASTERPAY" src="/assets/masterpay-logo.png"/></div>
+<div class="tabs"><button class="tab active" id="loginTab">Login</button><button class="tab" id="registerTab">Create Account</button></div>
+<form id="loginForm">
+<h1>Welcome back</h1><p class="muted">Sign in to your MASTERPAY panel.</p>
+<label>Email<input autocomplete="email" name="email" required="" type="email"/></label>
+<label>Password<input autocomplete="current-password" name="password" required="" type="password"/></label>
+<button class="primary" type="submit">Login</button>
+</form>
+<form class="hidden" id="registerForm">
+<h1>Create account</h1><p class="muted">Set up your MASTERPAY account.</p>
+<label>Full name<input maxlength="120" name="name" required=""/></label>
+<label>Email<input autocomplete="email" name="email" required="" type="email"/></label>
+<label>Password<input autocomplete="new-password" minlength="8" name="password" required="" type="password"/></label>
+<button class="primary" type="submit">Create Account</button>
+</form>
+<div class="msg" id="authMsg"></div>
+</section>
+</div>
+<div class="hidden" id="panelView">
+<nav aria-label="Main navigation" class="nav" id="sideNav">
+<button class="nav-btn active" data-view="dashboard"><span>⌂</span> Home</button>
+<button class="nav-btn" data-view="profile"><span>◎</span> Profile</button>
+<button class="nav-btn" data-view="kyc"><span>✓</span> KYC</button>
+<button class="nav-btn" data-view="securityDeposit"><span>＋</span> Security Deposit</button><button class="nav-btn" data-view="wallet"><span>₹</span> Wallet</button>
+<button class="nav-btn" data-view="banks"><span>▣</span> Banks</button>
+<button class="nav-btn" data-view="transactions"><span>↕</span> Transactions</button>
+<button class="nav-btn" data-view="notifications"><span>◉</span> Alerts</button>
+<button class="nav-btn" data-view="support"><span>?</span> Support</button>
+<button class="nav-btn" data-view="security"><span>⌑</span> Security</button>
+<button class="nav-btn hidden" data-view="admin" id="adminNav"><span>⚙</span> Admin</button>
+</nav>
+<div aria-hidden="true" class="nav-overlay" id="navOverlay"></div>
+<main>
+<section class="view active" id="dashboard">
+<div class="hero">
+<div>
+<span class="eyebrow">MASTERPAY™ PANEL</span>
+<h2 id="welcome">Welcome</h2>
+<p class="muted">Your account, wallet and activity in one place.</p>
+</div>
+<span class="pill"><i></i> Secure session</span>
+</div>
+<div class="balance-panel">
+<div><span class="label">AVAILABLE WALLET BALANCE</span><strong id="dashBalance">₹0.00</strong><span class="sub">Server-side balance</span></div>
+<button class="outline-btn" data-view="wallet">Open Wallet →</button>
+</div>
+<div class="quick-actions">
+<button class="action" data-view="securityDeposit"><span>＋</span><b>Security Deposit</b><small>Payment setup</small></button>
+<button class="action" data-view="wallet"><span>↗</span><b>Withdraw</b><small>Payment setup</small></button>
+<button class="action" data-view="transactions"><span>↕</span><b>History</b><small>View activity</small></button>
+<button class="action" data-view="support"><span>?</span><b>Support</b><small>Get help</small></button>
+</div>
+<div class="cards">
+<button class="card" data-view="wallet"><span>₹</span><b>WALLET</b><small>Balance &amp; activity</small></button>
+<button class="card" data-view="banks"><span>▣</span><b>BANK ACCOUNTS</b><small>Manage accounts</small></button>
+<button class="card" data-view="transactions"><span>↕</span><b>TRANSACTIONS</b><small>History</small></button>
+<button class="card" data-view="kyc"><span>✓</span><b>KYC</b><small id="kycCard">Not submitted</small></button>
+</div>
+<div class="summary panel"><div class="panel-title"><div><h3>Account Summary</h3><p class="muted">Current account status</p></div><span class="status-dot" id="statusDot">Active</span></div><div class="stats"><div><small>Wallet balance</small><strong id="dashBalance2">₹0.00</strong></div><div><small>KYC</small><strong id="dashKyc">—</strong></div><div><small>Status</small><strong id="dashStatus">—</strong></div></div></div>
+</section>
+<section class="view" id="profile"><div class="panel"><div class="section-head"><div><span class="eyebrow">ACCOUNT</span><h2>Profile</h2><p class="muted">Your MASTERPAY account information.</p></div></div><div class="profile-grid"><div><small>Name</small><b id="pName">—</b></div><div><small>Email</small><b id="pEmail">—</b></div><div><small>Role</small><b id="pRole">—</b></div><div><small>Joined</small><b id="pJoined">—</b></div></div></div></section>
+<section class="view" id="kyc"><div class="panel"><span class="eyebrow">VERIFICATION</span><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice"><b>KYC workflow</b><br/>Production identity verification should use a compliant KYC provider. This version intentionally does not collect identity documents directly.</div></div></section>
+<section class="view" id="securityDeposit"><div class="panel form-panel deposit-shell" id="depositPanel">
+<div class="deposit-heading">
+<div>
+<span class="eyebrow">SECURITY DEPOSIT</span>
+<h3>Security Deposit Plan</h3>
+<p class="muted">Select a plan, transfer the exact amount, then submit your UTR for verification.</p>
+</div>
 
-  <div id="authView">
-    <section class="auth-card">
-      <div class="auth-brand"><img src="/assets/masterpay-logo.png" alt="MASTERPAY"></div>
-      <div class="tabs"><button id="loginTab" class="tab active">Login</button><button id="registerTab" class="tab">Create Account</button></div>
-      <form id="loginForm">
-        <h1>Welcome back</h1><p class="muted">Sign in to your MASTERPAY panel.</p>
-        <label>Email<input name="email" type="email" autocomplete="email" required></label>
-        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="primary" type="submit">Login</button>
-      </form>
-      <form id="registerForm" class="hidden">
-        <h1>Create account</h1><p class="muted">Set up your MASTERPAY account.</p>
-        <label>Full name<input name="name" required maxlength="120"></label>
-        <label>Email<input name="email" type="email" autocomplete="email" required></label>
-        <label>Password<input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
-        <button class="primary" type="submit">Create Account</button>
-      </form>
-      <div id="authMsg" class="msg"></div>
-    </section>
-  </div>
+</div>
+<form class="deposit-form" id="depositForm">
+<section class="deposit-card plan-card">
+<div class="deposit-card-head">
+<div class="deposit-icon">▤</div>
+<div><span class="card-kicker">SECURITY DEPOSIT</span><h4>Choose your deposit plan</h4></div>
+</div>
+<div class="plan-grid">
+<label class="plan-select-wrap">Select plan
+                    <select id="depositPlan" name="amount" required="">
+<option value="">Select a plan</option>
+<option value="3000">Savings — ₹3,000</option>
+<option value="10000">Current — ₹10,000</option>
+<option value="50000">Corporate — ₹50,000</option>
+</select>
+</label>
+<div class="amount-display">
+<span>Security Deposit amount</span>
+<strong id="depositAmount">₹0.00</strong>
+</div>
+</div>
+</section>
+<section class="deposit-card bank-payment-card">
+<div class="deposit-card-head">
+<div class="deposit-icon bank-glow">⌂</div>
+<div><span class="card-kicker">BANK TRANSFER</span><h4>Transfer to bank account</h4><p>Send exactly the selected plan amount.</p></div>
+</div>
+<div class="payment-details">
+<div class="payment-row"><span>Bank name</span><b id="paymentBankName">Bank of India</b></div>
+<div class="payment-row"><span>Account holder</span><b id="paymentAccountHolder">Rohit Nagar</b></div>
+<div class="payment-row"><span>Account number</span><b id="paymentAccountNumber">992618210001746</b><button class="copy-btn" data-copy="992618210001746" id="copyAccountNumber" type="button">Copy</button></div>
+<div class="payment-row"><span>IFSC code</span><b id="paymentIfsc">BKID0008856</b><button class="copy-btn" data-copy="BKID0008856" id="copyIfsc" type="button">Copy</button></div>
+</div>
+</section>
+<section class="deposit-card upi-payment-card">
+<div class="deposit-card-head">
+<div class="deposit-icon upi-glow">⌁</div>
+<div><span class="card-kicker">UPI PAYMENT</span><h4>Pay using UPI</h4><p>Scan the QR or use the UPI ID below.</p></div>
+</div>
+<div class="upi-layout">
+<div class="qr-box">
+<img alt="MASTERPAY UPI QR code" id="paymentQr" src="/assets/upi-qr.jpeg"/>
+<span id="paymentQrName">ROHIT NARAYANSINGH</span>
+</div>
+<div class="upi-info">
+<div class="upi-id-row"><div><small>UPI ID</small><b id="paymentUpiId">rohitnagar3870@ibl</b></div><button class="copy-btn" data-copy="rohitnagar3870@ibl" id="copyUpi" type="button">Copy</button></div>
+<div class="upi-id-row"><div><small>UPI name</small><b id="paymentUpiName">ROHIT NARAYANSINGH</b></div></div>
+<div class="payment-tip"><b>Before you pay</b><span>Use the exact deposit amount shown above and verify the recipient name in your UPI app.</span></div>
+</div>
+</div>
+</section>
+<section class="deposit-card confirmation-card">
+<div class="deposit-card-head">
+<div class="deposit-icon confirm-glow">✓</div>
+<div><span class="card-kicker">PAYMENT CONFIRMATION</span><h4>Enter your UTR</h4><p>After completing the transfer, enter the UTR / transaction ID.</p></div>
+</div>
+<label class="utr-label">UTR / Transaction ID
+                  <input autocomplete="off" id="depositUtr" inputmode="text" maxlength="120" name="utr" placeholder="Enter UTR after making the payment" required="" type="text"/>
+</label>
+<div class="confirmation-actions">
+<div class="pending-note"><span>◷</span><span>Your request will be marked <b>Pending</b> until payment verification.</span></div>
+<button class="deposit-submit" type="submit">➤ Submit Deposit</button>
+</div>
+</section>
+</form>
+</div></section><section class="view" id="wallet">
+<div class="panel wallet-page">
+<span class="eyebrow">WALLET</span>
+<h2>Your Wallet</h2>
+<div class="big" id="walletBalance">₹0.00</div>
+<span class="sub">Available server-side balance</span>
+<div class="wallet-actions">
+<button class="primary" id="openBankFromWallet" type="button">＋ Add Account</button>
 
-  <div id="panelView" class="hidden">
-    <nav id="sideNav" class="nav" aria-label="Main navigation">
-      <button data-view="dashboard" class="nav-btn active"><span>⌂</span> Home</button>
-      <button data-view="profile" class="nav-btn"><span>◎</span> Profile</button>
-      <button data-view="kyc" class="nav-btn"><span>✓</span> KYC</button>
-      <button data-view="wallet" class="nav-btn"><span>₹</span> Wallet</button>
-      <button data-view="banks" class="nav-btn"><span>▣</span> Banks</button>
-      <button data-view="transactions" class="nav-btn"><span>↕</span> Transactions</button>
-      <button data-view="notifications" class="nav-btn"><span>◉</span> Alerts</button>
-      <button data-view="support" class="nav-btn"><span>?</span> Support</button>
-      <button data-view="security" class="nav-btn"><span>⌑</span> Security</button>
-      <button data-view="admin" id="adminNav" class="nav-btn hidden"><span>⚙</span> Admin</button>
-    </nav>
-    <div id="navOverlay" class="nav-overlay" aria-hidden="true"></div>
+<button class="secondary" id="openWithdraw" type="button">↗ Withdraw</button>
+</div>
+<div class="msg" id="walletMsg"></div>
+</div>
+<div class="wallet-forms">
 
-    <main>
-      <section id="dashboard" class="view active">
-        <div class="hero">
-          <div>
-            <span class="eyebrow">MASTERPAY™ PANEL</span>
-            <h2 id="welcome">Welcome</h2>
-            <p class="muted">Your account, wallet and activity in one place.</p>
-          </div>
-          <span class="pill"><i></i> Secure session</span>
-        </div>
-
-        <div class="balance-panel">
-          <div><span class="label">AVAILABLE WALLET BALANCE</span><strong id="dashBalance">₹0.00</strong><span class="sub">Server-side balance</span></div>
-          <button data-view="wallet" class="outline-btn">Open Wallet →</button>
-        </div>
-
-        <div class="quick-actions">
-          <button data-view="wallet" class="action"><span>＋</span><b>Deposit</b><small>Payment setup</small></button>
-          <button data-view="wallet" class="action"><span>↗</span><b>Withdraw</b><small>Payment setup</small></button>
-          <button data-view="transactions" class="action"><span>↕</span><b>History</b><small>View activity</small></button>
-          <button data-view="support" class="action"><span>?</span><b>Support</b><small>Get help</small></button>
-        </div>
-
-        <div class="cards">
-          <button data-view="wallet" class="card"><span>₹</span><b>WALLET</b><small>Balance & activity</small></button>
-          <button data-view="banks" class="card"><span>▣</span><b>BANK ACCOUNTS</b><small>Manage accounts</small></button>
-          <button data-view="transactions" class="card"><span>↕</span><b>TRANSACTIONS</b><small>History</small></button>
-          <button data-view="kyc" class="card"><span>✓</span><b>KYC</b><small id="kycCard">Not submitted</small></button>
-        </div>
-
-        <div class="summary panel"><div class="panel-title"><div><h3>Account Summary</h3><p class="muted">Current account status</p></div><span class="status-dot" id="statusDot">Active</span></div><div class="stats"><div><small>Wallet balance</small><strong id="dashBalance2">₹0.00</strong></div><div><small>KYC</small><strong id="dashKyc">—</strong></div><div><small>Status</small><strong id="dashStatus">—</strong></div></div></div>
-      </section>
-
-      <section id="profile" class="view"><div class="panel"><div class="section-head"><div><span class="eyebrow">ACCOUNT</span><h2>Profile</h2><p class="muted">Your MASTERPAY account information.</p></div></div><div class="profile-grid"><div><small>Name</small><b id="pName">—</b></div><div><small>Email</small><b id="pEmail">—</b></div><div><small>Role</small><b id="pRole">—</b></div><div><small>Joined</small><b id="pJoined">—</b></div></div></div></section>
-
-      <section id="kyc" class="view"><div class="panel"><span class="eyebrow">VERIFICATION</span><h2>KYC Verification</h2><p class="muted">Current status: <b id="kycStatus">—</b></p><div class="notice"><b>KYC workflow</b><br>Production identity verification should use a compliant KYC provider. This version intentionally does not collect identity documents directly.</div></div></section>
-
-      <section id="wallet" class="view">
-        <div class="panel wallet-page">
-          <span class="eyebrow">WALLET</span>
-          <h2>Your Wallet</h2>
-          <div class="big" id="walletBalance">₹0.00</div>
-          <span class="sub">Available server-side balance</span>
-          <div class="wallet-actions">
-            <button class="primary" type="button" id="openBankFromWallet">＋ Add Account</button>
-            <button class="primary" type="button" id="openDeposit">＋ Deposit</button>
-            <button class="secondary" type="button" id="openWithdraw">↗ Withdraw</button>
-          </div>
-          <div id="walletMsg" class="msg"></div>
-        </div>
-
-        <div class="wallet-forms">
-          <div class="panel form-panel hidden deposit-shell" id="depositPanel">
-            <div class="deposit-heading">
-              <div>
-                <span class="eyebrow">ADD FUNDS</span>
-                <h3>Deposit Plan</h3>
-                <p class="muted">Select a plan, transfer the exact amount, then submit your UTR for verification.</p>
-              </div>
-              <button class="ghost close-form" type="button">Close</button>
-            </div>
-
-            <form id="depositForm" class="deposit-form">
-              <section class="deposit-card plan-card">
-                <div class="deposit-card-head">
-                  <div class="deposit-icon">▤</div>
-                  <div><span class="card-kicker">PLAN</span><h4>Choose your deposit plan</h4></div>
-                </div>
-                <div class="plan-grid">
-                  <label class="plan-select-wrap">Select plan
-                    <select name="amount" id="depositPlan" required>
-                      <option value="">Select a plan</option>
-                      <option value="3000">Savings — ₹3,000</option>
-                      <option value="10000">Current — ₹10,000</option>
-                      <option value="50000">Corporate — ₹50,000</option>
-                    </select>
-                  </label>
-                  <div class="amount-display">
-                    <span>Deposit amount</span>
-                    <strong id="depositAmount">₹0.00</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section class="deposit-card bank-payment-card">
-                <div class="deposit-card-head">
-                  <div class="deposit-icon bank-glow">⌂</div>
-                  <div><span class="card-kicker">BANK TRANSFER</span><h4>Transfer to bank account</h4><p>Send exactly the selected plan amount.</p></div>
-                </div>
-                <div class="payment-details">
-                  <div class="payment-row"><span>Bank name</span><b id="paymentBankName">Bank of India</b></div>
-                  <div class="payment-row"><span>Account holder</span><b id="paymentAccountHolder">Rohit Nagar</b></div>
-                  <div class="payment-row"><span>Account number</span><b id="paymentAccountNumber">992618210001746</b><button type="button" class="copy-btn" id="copyAccountNumber" data-copy="992618210001746">Copy</button></div>
-                  <div class="payment-row"><span>IFSC code</span><b id="paymentIfsc">BKID0008856</b><button type="button" class="copy-btn" id="copyIfsc" data-copy="BKID0008856">Copy</button></div>
-                </div>
-              </section>
-
-              <section class="deposit-card upi-payment-card">
-                <div class="deposit-card-head">
-                  <div class="deposit-icon upi-glow">⌁</div>
-                  <div><span class="card-kicker">UPI PAYMENT</span><h4>Pay using UPI</h4><p>Scan the QR or use the UPI ID below.</p></div>
-                </div>
-                <div class="upi-layout">
-                  <div class="qr-box">
-                    <img id="paymentQr" src="/assets/upi-qr.jpeg" alt="MASTERPAY UPI QR code">
-                    <span id="paymentQrName">ROHIT NARAYANSINGH</span>
-                  </div>
-                  <div class="upi-info">
-                    <div class="upi-id-row"><div><small>UPI ID</small><b id="paymentUpiId">rohitnagar3870@ibl</b></div><button type="button" class="copy-btn" id="copyUpi" data-copy="rohitnagar3870@ibl">Copy</button></div>
-                    <div class="upi-id-row"><div><small>UPI name</small><b id="paymentUpiName">ROHIT NARAYANSINGH</b></div></div>
-                    <div class="payment-tip"><b>Before you pay</b><span>Use the exact deposit amount shown above and verify the recipient name in your UPI app.</span></div>
-                  </div>
-                </div>
-              </section>
-
-              <section class="deposit-card confirmation-card">
-                <div class="deposit-card-head">
-                  <div class="deposit-icon confirm-glow">✓</div>
-                  <div><span class="card-kicker">PAYMENT CONFIRMATION</span><h4>Enter your UTR</h4><p>After completing the transfer, enter the UTR / transaction ID.</p></div>
-                </div>
-                <label class="utr-label">UTR / Transaction ID
-                  <input name="utr" id="depositUtr" type="text" inputmode="text" autocomplete="off" maxlength="120" placeholder="Enter UTR after making the payment" required>
-                </label>
-                <div class="confirmation-actions">
-                  <div class="pending-note"><span>◷</span><span>Your request will be marked <b>Pending</b> until payment verification.</span></div>
-                  <button class="deposit-submit" type="submit">➤ Submit Deposit</button>
-                </div>
-              </section>
-            </form>
-          </div>
-
-          <div class="panel form-panel hidden" id="withdrawPanel"><div class="panel-title"><div><span class="eyebrow">PAYOUT</span><h3>Withdrawal Request</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="withdrawForm" class="inline-form"><label>Amount (INR)<input name="amount" type="number" min="1" max="1000000" step="0.01" placeholder="500" required></label><label>Bind withdrawal bank<select name="bank_id" id="withdrawBank" required><option value="">Select a verified bank account</option></select></label><button class="primary" type="button" id="bindWithdrawalBank">＋ Bind Withdrawal Bank</button><button class="secondary" type="submit">Create Withdrawal Request</button></form><div class="notice">Bind a verified bank account before creating a withdrawal request. If you have not added a bank account, use the bind option above.</div></div>
-        </div>
-      </section>
-      <section id="banks" class="view"><div class="panel"><div class="panel-title"><div><span class="eyebrow">BANKING</span><h2>Bank Accounts</h2><p class="muted">Add and manage bank accounts for future verified payouts.</p></div><button class="primary" type="button" id="openBankForm">＋ Add Bank</button></div><div id="banksList" class="list">Loading…</div></div><div class="panel form-panel hidden" id="bankPanel"><div class="panel-title"><div><span class="eyebrow">NEW ACCOUNT</span><h3>Add Bank Account</h3></div><button class="ghost close-form" type="button">Close</button></div><form id="bankForm" class="bank-form"><label>Select bank<select name="bank_name" id="bankName" required><option value="">Select your bank</option><optgroup label="Public Sector Banks"><option>State Bank of India</option><option>Bank of Baroda</option><option>Bank of India</option><option>Bank of Maharashtra</option><option>Canara Bank</option><option>Central Bank of India</option><option>Indian Bank</option><option>Indian Overseas Bank</option><option>Punjab National Bank</option><option>Punjab & Sind Bank</option><option>UCO Bank</option><option>Union Bank of India</option></optgroup><optgroup label="Private Sector Banks"><option>Axis Bank</option><option>Bandhan Bank</option><option>CSB Bank</option><option>City Union Bank</option><option>DCB Bank</option><option>Dhanlaxmi Bank</option><option>Federal Bank</option><option>HDFC Bank</option><option>ICICI Bank</option><option>IDBI Bank</option><option>IDFC FIRST Bank</option><option>IndusInd Bank</option><option>Jammu & Kashmir Bank</option><option>Karnataka Bank</option><option>Karur Vysya Bank</option><option>Kotak Mahindra Bank</option><option>RBL Bank</option><option>South Indian Bank</option><option>Tamilnad Mercantile Bank</option><option>Yes Bank</option></optgroup><optgroup label="Small Finance Banks"><option>AU Small Finance Bank</option><option>Capital Small Finance Bank</option><option>Equitas Small Finance Bank</option><option>ESAF Small Finance Bank</option><option>Jana Small Finance Bank</option><option>North East Small Finance Bank</option><option>Shivalik Small Finance Bank</option><option>Suryoday Small Finance Bank</option><option>Ujjivan Small Finance Bank</option><option>Unity Small Finance Bank</option><option>Utkarsh Small Finance Bank</option></optgroup><optgroup label="Payments Banks"><option>India Post Payments Bank</option><option>Fino Payments Bank</option><option>Jio Payments Bank</option><option>NSDL Payments Bank</option><option>Paytm Payments Bank</option></optgroup><optgroup label="Other Banks Operating in India"><option>DBS Bank India</option><option>HSBC India</option><option>Standard Chartered Bank India</option><option>Deutsche Bank India</option><option>Bank of America India</option><option>Barclays Bank India</option><option>BNP Paribas India</option><option>Citibank India</option><option>J.P. Morgan India</option><option>MUFG Bank India</option><option>Qatar National Bank India</option><option>Societe Generale India</option></optgroup></select></label><label>Account type<select name="account_type" required><option value="">Select account type</option><option value="savings">Savings</option><option value="current">Current</option><option value="corporate">Corporate</option></select></label><label>Account number<input name="account_number" inputmode="numeric" autocomplete="off" maxlength="24" placeholder="6–24 digits" required></label><label>IFSC code<input name="ifsc_code" maxlength="11" autocomplete="off" placeholder="e.g. SBIN0001234" style="text-transform:uppercase" required></label><label>Account holder name<input name="account_holder" maxlength="120" placeholder="Name on account" required></label><label>Mobile number<input name="mobile_number" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="10-digit mobile number" required></label><button class="primary" type="submit">Save Bank Account</button></form><div class="notice">For security, MASTERPAY stores only the last 4 digits in this starter. Use a verified banking/payment provider before using these details for real payouts.</div><div id="bankMsg" class="msg"></div></div></section>
-
-      <section id="transactions" class="view"><div class="panel"><span class="eyebrow">ACTIVITY</span><h2>Transactions</h2><p class="muted">Your account transaction history.</p><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
-
-      <section id="notifications" class="view"><div class="panel"><span class="eyebrow">UPDATES</span><h2>Notifications</h2><p class="muted">Important account messages will appear here.</p><div id="notificationList" class="empty-state"><span>◉</span><b>No new notifications</b><small>You're all caught up.</small></div></div></section>
-
-      <section id="support" class="view"><div class="panel"><span class="eyebrow">HELP CENTER</span><h2>Support</h2><p class="muted">Choose how you want to contact MASTERPAY.</p><div class="wallet-actions"><a class="primary" href="https://t.me/masterpayof" target="_blank" rel="noopener noreferrer">Official Telegram Channel</a><a class="secondary" href="https://t.me/masterpay_xiao" target="_blank" rel="noopener noreferrer">Customer Support Executive</a></div></div></section>
-
-      <section id="security" class="view"><div class="panel"><span class="eyebrow">SECURITY</span><h2>Security</h2><p class="muted">Basic account-security information.</p><div class="security-list"><div><b>Session</b><span>HTTP-only authentication cookie</span></div><div><b>Password</b><span>Stored as a server-side hash</span></div><div><b>Transport</b><span>Use HTTPS in production</span></div></div><div class="notice">Never share your password, database credentials, JWT secret, or payment credentials.</div></div></section>
-
-      <section id="admin" class="view">
-        <div class="panel admin-panel">
-          <div class="panel-title"><div><span class="eyebrow">ADMIN CONTROL</span><h2>Payment Settings</h2><p class="muted">Change the bank account, UPI details and QR image shown to users on the Deposit page.</p></div><span class="admin-badge">ADMIN ONLY</span></div>
-          <form id="paymentSettingsForm" class="payment-settings-form">
-            <div class="settings-grid">
-              <label>Bank name<input name="bank_name" id="settingBankName" maxlength="120" required></label>
-              <label>Account holder<input name="account_holder" id="settingAccountHolder" maxlength="120" required></label>
-              <label>Account number<input name="account_number" id="settingAccountNumber" inputmode="numeric" maxlength="24" required></label>
-              <label>IFSC code<input name="ifsc_code" id="settingIfsc" maxlength="11" required></label>
-              <label>UPI ID<input name="upi_id" id="settingUpiId" maxlength="180" required></label>
-              <label>UPI name<input name="upi_name" id="settingUpiName" maxlength="120" required></label>
-              <label class="full">QR image URL<input name="qr_image_url" id="settingQrUrl" maxlength="200000" placeholder="/assets/upi-qr.jpeg" required><small>Use a public image URL or a project path such as /assets/upi-qr.jpeg. You can replace the QR file in GitHub later.</small></label>
-            </div>
-            <div class="settings-preview"><div><span class="card-kicker">QR PREVIEW</span><img id="settingQrPreview" src="/assets/upi-qr.jpeg" alt="QR preview"></div><div class="settings-actions"><button class="deposit-submit" type="submit">Save Payment Settings</button><div id="paymentSettingsMsg" class="msg"></div></div></div>
-          </form>
-        </div>
-        <div class="panel admin-users-panel"><div class="panel-title"><div><span class="eyebrow">USERS</span><h3>Registered Users</h3></div></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div>
-      </section>
-    </main>
-  </div>
-
-  <footer>© 2026 MASTERPAY™ · Original panel interface · Configure production compliance and payment services before launch.</footer>
+<div class="panel form-panel hidden" id="withdrawPanel"><div class="panel-title"><div><span class="eyebrow">PAYOUT</span><h3>Withdrawal Request</h3></div><button class="ghost close-form" type="button">Close</button></div><form class="inline-form" id="withdrawForm"><label>Amount (INR)<input max="1000000" min="1" name="amount" placeholder="500" required="" step="0.01" type="number"/></label><label>Bind withdrawal bank<select id="withdrawBank" name="bank_id" required=""><option value="">Select a verified bank account</option></select></label><button class="primary" id="bindWithdrawalBank" type="button">＋ Bind Withdrawal Bank</button><button class="secondary" type="submit">Create Withdrawal Request</button></form><div class="notice">Bind a verified bank account before creating a withdrawal request. If you have not added a bank account, use the bind option above.</div></div>
+</div>
+</section>
+<section class="view" id="banks"><div class="panel"><div class="panel-title"><div><span class="eyebrow">BANKING</span><h2>Bank Accounts</h2><p class="muted">Add and manage bank accounts for future verified payouts.</p></div><button class="primary" id="openBankForm" type="button">＋ Add Bank</button></div><div class="list" id="banksList">Loading…</div></div><div class="panel form-panel hidden" id="bankPanel"><div class="panel-title"><div><span class="eyebrow">NEW ACCOUNT</span><h3>Add Bank Account</h3></div><button class="ghost close-form" type="button">Close</button></div><form class="bank-form" id="bankForm"><label>Select bank<select id="bankName" name="bank_name" required=""><option value="">Select your bank</option><optgroup label="Public Sector Banks"><option>State Bank of India</option><option>Bank of Baroda</option><option>Bank of India</option><option>Bank of Maharashtra</option><option>Canara Bank</option><option>Central Bank of India</option><option>Indian Bank</option><option>Indian Overseas Bank</option><option>Punjab National Bank</option><option>Punjab &amp; Sind Bank</option><option>UCO Bank</option><option>Union Bank of India</option></optgroup><optgroup label="Private Sector Banks"><option>Axis Bank</option><option>Bandhan Bank</option><option>CSB Bank</option><option>City Union Bank</option><option>DCB Bank</option><option>Dhanlaxmi Bank</option><option>Federal Bank</option><option>HDFC Bank</option><option>ICICI Bank</option><option>IDBI Bank</option><option>IDFC FIRST Bank</option><option>IndusInd Bank</option><option>Jammu &amp; Kashmir Bank</option><option>Karnataka Bank</option><option>Karur Vysya Bank</option><option>Kotak Mahindra Bank</option><option>RBL Bank</option><option>South Indian Bank</option><option>Tamilnad Mercantile Bank</option><option>Yes Bank</option></optgroup><optgroup label="Small Finance Banks"><option>AU Small Finance Bank</option><option>Capital Small Finance Bank</option><option>Equitas Small Finance Bank</option><option>ESAF Small Finance Bank</option><option>Jana Small Finance Bank</option><option>North East Small Finance Bank</option><option>Shivalik Small Finance Bank</option><option>Suryoday Small Finance Bank</option><option>Ujjivan Small Finance Bank</option><option>Unity Small Finance Bank</option><option>Utkarsh Small Finance Bank</option></optgroup><optgroup label="Payments Banks"><option>India Post Payments Bank</option><option>Fino Payments Bank</option><option>Jio Payments Bank</option><option>NSDL Payments Bank</option><option>Paytm Payments Bank</option></optgroup><optgroup label="Other Banks Operating in India"><option>DBS Bank India</option><option>HSBC India</option><option>Standard Chartered Bank India</option><option>Deutsche Bank India</option><option>Bank of America India</option><option>Barclays Bank India</option><option>BNP Paribas India</option><option>Citibank India</option><option>J.P. Morgan India</option><option>MUFG Bank India</option><option>Qatar National Bank India</option><option>Societe Generale India</option></optgroup></select></label><label>Account type<select name="account_type" required=""><option value="">Select account type</option><option value="savings">Savings</option><option value="current">Current</option><option value="corporate">Corporate</option></select></label><label>Account number<input autocomplete="off" inputmode="numeric" maxlength="24" name="account_number" placeholder="6–24 digits" required=""/></label><label>IFSC code<input autocomplete="off" maxlength="11" name="ifsc_code" placeholder="e.g. SBIN0001234" required="" style="text-transform:uppercase"/></label><label>Account holder name<input maxlength="120" name="account_holder" placeholder="Name on account" required=""/></label><label>Mobile number<input autocomplete="tel" inputmode="numeric" maxlength="10" name="mobile_number" placeholder="10-digit mobile number" required=""/></label><button class="primary" type="submit">Save Bank Account</button></form><div class="notice">For security, MASTERPAY stores only the last 4 digits in this starter. Use a verified banking/payment provider before using these details for real payouts.</div><div class="msg" id="bankMsg"></div></div></section>
+<section class="view" id="transactions"><div class="panel"><span class="eyebrow">ACTIVITY</span><h2>Transactions</h2><p class="muted">Your account transaction history.</p><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
+<section class="view" id="notifications"><div class="panel"><span class="eyebrow">UPDATES</span><h2>Notifications</h2><p class="muted">Important account messages will appear here.</p><div class="empty-state" id="notificationList"><span>◉</span><b>No new notifications</b><small>You're all caught up.</small></div></div></section>
+<section class="view" id="support"><div class="panel"><span class="eyebrow">HELP CENTER</span><h2>Support</h2><p class="muted">Choose how you want to contact MASTERPAY.</p><div class="wallet-actions"><a class="primary" href="https://t.me/masterpayof" rel="noopener noreferrer" target="_blank">Official Telegram Channel</a><a class="secondary" href="https://t.me/masterpay_xiao" rel="noopener noreferrer" target="_blank">Customer Support Executive</a></div></div></section>
+<section class="view" id="security"><div class="panel"><span class="eyebrow">SECURITY</span><h2>Security</h2><p class="muted">Basic account-security information.</p><div class="security-list"><div><b>Session</b><span>HTTP-only authentication cookie</span></div><div><b>Password</b><span>Stored as a server-side hash</span></div><div><b>Transport</b><span>Use HTTPS in production</span></div></div><div class="notice">Never share your password, database credentials, JWT secret, or payment credentials.</div></div></section>
+<section class="view" id="admin">
+<div class="panel admin-panel">
+<div class="panel-title"><div><span class="eyebrow">ADMIN CONTROL</span><h2>Payment Settings</h2><p class="muted">Change the bank account, UPI details and QR image shown to users on the Security Deposit page.</p></div><span class="admin-badge">ADMIN ONLY</span></div>
+<form class="payment-settings-form" id="paymentSettingsForm">
+<div class="settings-grid">
+<label>Bank name<input id="settingBankName" maxlength="120" name="bank_name" required=""/></label>
+<label>Account holder<input id="settingAccountHolder" maxlength="120" name="account_holder" required=""/></label>
+<label>Account number<input id="settingAccountNumber" inputmode="numeric" maxlength="24" name="account_number" required=""/></label>
+<label>IFSC code<input id="settingIfsc" maxlength="11" name="ifsc_code" required=""/></label>
+<label>UPI ID<input id="settingUpiId" maxlength="180" name="upi_id" required=""/></label>
+<label>UPI name<input id="settingUpiName" maxlength="120" name="upi_name" required=""/></label>
+<label class="full">QR image URL<input id="settingQrUrl" maxlength="200000" name="qr_image_url" placeholder="/assets/upi-qr.jpeg" required=""/><small>Use a public image URL or a project path such as /assets/upi-qr.jpeg. You can replace the QR file in GitHub later.</small></label>
+</div>
+<div class="settings-preview"><div><span class="card-kicker">QR PREVIEW</span><img alt="QR preview" id="settingQrPreview" src="/assets/upi-qr.jpeg"/></div><div class="settings-actions"><button class="deposit-submit" type="submit">Save Payment Settings</button><div class="msg" id="paymentSettingsMsg"></div></div></div>
+</form>
+</div>
+<div class="panel admin-users-panel"><div class="panel-title"><div><span class="eyebrow">USERS</span><h3>Registered Users</h3></div></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>KYC</th><th>Status</th></tr></thead><tbody id="usersBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div>
+</section>
+</main>
+</div>
+<footer>© 2026 MASTERPAY™ · Original panel interface · Configure production compliance and payment services before launch.</footer>
 </div>
 <script src="/app.js"></script>
 </body>

@@ -85,6 +85,65 @@ async function loadAdminPaymentSettings(){
   try{const d=await api("/api/admin/payment-settings");fillPaymentSettingsForm(d.settings);}catch(e){$("#paymentSettingsMsg").textContent=e.message;}
 }
 
+function demoType(x){
+  if(String(x.reference||'').startsWith('SIM-DEMO-')) return x.type==='deposit'?'DEMO CREDIT':'DEMO DEBIT';
+  return x.type;
+}
+
+function demoCommission(x){
+  return String(x.reference||'').startsWith('SIM-DEMO-') ? Number(x.amount||0)*0.07 : 0;
+}
+
+let demoToastQueue=[];
+let demoToastTimer=null;
+let lastNotificationIds=new Set();
+
+function showDemoToast(n){
+  const toast=$("#demoToast"); if(!toast) return;
+  const isCredit=String(n.title||'').includes('CREDIT');
+  $("#demoToastIcon").textContent=isCredit?'+':'−';
+  $("#demoToastTitle").textContent=n.title||'DEMO ALERT';
+  const match=String(n.body||'').match(/(credited|debited) (₹[0-9,]+\.\d{2})/i);
+  $("#demoToastAmount").textContent=match?.[2]||'Demo activity';
+  $("#demoToastBody").textContent='SIMULATION ONLY • No real funds moved';
+  toast.classList.remove('hidden');
+  clearTimeout(demoToastTimer);
+  demoToastTimer=setTimeout(()=>toast.classList.add('hidden'),5500);
+}
+
+function queueDemoNotifications(notifications, force=false){
+  const fresh=notifications.filter(n=>String(n.title||'').startsWith('DEMO ') && (force || !lastNotificationIds.has(n.id)));
+  fresh.slice().reverse().forEach(n=>demoToastQueue.push(n));
+  lastNotificationIds=new Set(notifications.map(n=>n.id));
+  if(!$("#demoToast")?.classList.contains('hidden')) return;
+  const next=demoToastQueue.shift(); if(next) showDemoToast(next);
+}
+
+async function loadDemoCommission(){
+  try{
+    const d=await api('/api/commission-summary');
+    const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+    set('#demoCount',d.count);
+    set('#txTotalCount',d.count);
+    set('#walletDemoCount',d.count);
+    set('#demoCredits',money(d.credits)); set('#demoCreditsWallet',money(d.credits));
+    set('#demoDebits',money(d.debits)); set('#demoDebitsWallet',money(d.debits));
+    set('#demoVolume',money(d.volume)); set('#demoCommission',money(d.commission));
+    set('#demoDashboardCommission',money(d.commission)); set('#demoRate',`${Number(d.rate*100).toFixed(0)}%`);
+  }catch(e){console.error(e);}
+}
+
+async function loadNotifications(showToast=true){
+  try{
+    const d=await api('/api/notifications');
+    const list=$("#notificationList");
+    if(list) list.innerHTML=d.notifications.length ? d.notifications.map(n=>`<div class="notification-row ${n.is_read?'read':''}"><span class="notification-icon ${String(n.title||'').includes('DEBIT')?'debit':''}">${String(n.title||'').includes('CREDIT')?'+':'!'}</span><div><b>${escapeHtml(n.title)}</b><p>${escapeHtml(n.body)}</p><small>${escapeHtml(new Date(n.created_at).toLocaleString('en-IN'))}</small></div></div>`).join('') : `<div class="empty-state"><span>◉</span><b>No notifications</b><small>Your demo alerts will appear here.</small></div>`;
+    if(showToast) queueDemoNotifications(d.notifications);
+    const unread=d.notifications.filter(n=>!n.is_read).length;
+    $$('.nav-btn').filter(b=>b.dataset.view==='notifications').forEach(b=>{b.dataset.unread=unread?String(unread):'';});
+  }catch(e){console.error(e);}
+}
+
 async function loadData(){
   const me=await api("/api/me"); renderUser(me.user);
   await loadPaymentSettings();
@@ -102,8 +161,15 @@ async function loadData(){
   }catch(e){$("#banksList").textContent=e.message}
   try{
     const t=await api("/api/transactions");
-    $("#txBody").innerHTML=t.transactions.length?t.transactions.map(x=>`<tr><td>${escapeHtml(x.type)}</td><td>${money(x.amount)}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`).join(""):`<tr><td colspan="4">No transactions.</td></tr>`;
+    $("#txBody").innerHTML=t.transactions.length?t.transactions.map(x=>{
+      const isDemo=String(x.reference||'').startsWith('SIM-DEMO-');
+      const credit=x.type==='deposit';
+      const name=isDemo ? (credit?'Demo Customer':'Demo Payout') : x.type;
+      return `<tr class="${isDemo?'demo-row':''}"><td><div class="tx-name"><span class="tx-avatar ${credit?'credit':'debit'}">${credit?'+':'−'}</span><span><b>${escapeHtml(demoType(x))}</b><small>${escapeHtml(name)}</small></span></div></td><td class="${credit?'amount-credit':'amount-debit'}">${credit?'+':'−'}${money(x.amount)}</td><td>${isDemo?money(demoCommission(x)):'—'}</td><td><span class="tx-status">${escapeHtml(x.status)}</span></td><td>${escapeHtml(new Date(x.created_at).toLocaleString("en-IN"))}</td></tr>`;
+    }).join(""):`<tr><td colspan="5">No transactions.</td></tr>`;
   }catch(e){$("#txBody").innerHTML=`<tr><td colspan="4">${escapeHtml(e.message)}</td></tr>`}
+  await loadDemoCommission();
+  await loadNotifications();
   if(me.user.role==="admin"){
     await loadAdminPaymentSettings();
     try{
@@ -190,6 +256,13 @@ $("#paymentSettingsForm")?.addEventListener("submit",async(e)=>{
   try{const d=await api("/api/admin/payment-settings",{method:"PUT",body:JSON.stringify(body)});renderPaymentSettings(d.settings);fillPaymentSettingsForm(d.settings);msgEl.textContent=d.message;}catch(err){msgEl.textContent=err.message;}
 });
 $("#settingQrUrl")?.addEventListener("input",()=>{const v=$("#settingQrUrl").value.trim(); const img=$("#settingQrPreview"); if(img&&v) img.src=v;});
+
+
+$("#demoToastClose")?.addEventListener('click',()=>{ $("#demoToast").classList.add('hidden'); clearTimeout(demoToastTimer); const next=demoToastQueue.shift(); if(next) setTimeout(()=>showDemoToast(next),250); });
+
+$("#markNotificationsRead")?.addEventListener('click',async()=>{
+  try{await api('/api/notifications/read-all',{method:'POST'}); await loadNotifications();}catch(e){console.error(e);}
+});
 
 $("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); location.reload(); };
 

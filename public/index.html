@@ -65,6 +65,15 @@
 <div><span class="label">AVAILABLE WALLET BALANCE</span><strong id="dashBalance">₹0.00</strong><span class="sub">Server-side balance</span></div>
 <button class="outline-btn" data-view="wallet">Open Wallet →</button>
 </div>
+<div class="demo-dashboard panel">
+  <div class="panel-title"><div><span class="eyebrow">DEMO ACTIVITY</span><h3>Live Simulation Preview</h3><p class="muted">Matches the reference flow without touching real wallet funds.</p></div><span class="demo-chip">7% COMMISSION</span></div>
+  <div class="demo-stats">
+    <div><small>Total Transactions</small><strong id="demoCount">0</strong></div>
+    <div><small>Total Credit</small><strong class="demo-credit" id="demoCredits">₹0.00</strong></div>
+    <div><small>Total Debit</small><strong class="demo-debit" id="demoDebits">₹0.00</strong></div>
+    <div><small>Demo Earnings</small><strong id="demoDashboardCommission">₹0.00</strong></div>
+  </div>
+</div>
 <div class="quick-actions">
 <button class="action" data-view="securityDeposit"><span>＋</span><b>Security Deposit</b><small>Payment setup</small></button>
 <button class="action" data-view="wallet"><span>↗</span><b>Withdraw</b><small>Payment setup</small></button>
@@ -157,6 +166,7 @@
 </div></section><section class="view" id="wallet">
 <div class="panel wallet-page">
 <span class="eyebrow">WALLET</span>
+<div class="notice demo-notice"><b>DEMO SIMULATION</b><br/>Simulated credits, debits and commission are for testing only. They never move real money or change your wallet balance.</div>
 <h2>Your Wallet</h2>
 <div class="big" id="walletBalance">₹0.00</div>
 <span class="sub">Available server-side balance</span>
@@ -166,6 +176,14 @@
 <button class="secondary" id="openWithdraw" type="button">↗ Withdraw</button>
 </div>
 <div class="msg" id="walletMsg"></div>
+<div class="commission-grid">
+<div><small>TOTAL TRANSACTIONS</small><strong id="walletDemoCount">0</strong></div>
+<div><small>TOTAL CREDIT</small><strong class="demo-credit" id="demoCreditsWallet">₹0.00</strong></div>
+<div><small>TOTAL DEBIT</small><strong class="demo-debit" id="demoDebitsWallet">₹0.00</strong></div>
+<div><small>SIMULATED VOLUME</small><strong id="demoVolume">₹0.00</strong></div>
+<div><small>COMMISSION RATE</small><strong id="demoRate">7%</strong></div>
+<div><small>DEMO COMMISSION</small><strong id="demoCommission">₹0.00</strong></div>
+</div>
 </div>
 <div class="wallet-forms">
 
@@ -173,8 +191,9 @@
 </div>
 </section>
 <section class="view" id="banks"><div class="panel"><div class="panel-title"><div><span class="eyebrow">BANKING</span><h2>Bank Accounts</h2><p class="muted">Add and manage bank accounts for future verified payouts.</p></div><button class="primary" id="openBankForm" type="button">＋ Add Bank</button></div><div class="list" id="banksList">Loading…</div></div><div class="panel form-panel hidden" id="bankPanel"><div class="panel-title"><div><span class="eyebrow">NEW ACCOUNT</span><h3>Add Bank Account</h3></div><button class="ghost close-form" type="button">Close</button></div><form class="bank-form" id="bankForm"><label>Select bank<select id="bankName" name="bank_name" required=""><option value="">Select your bank</option><optgroup label="Public Sector Banks"><option>State Bank of India</option><option>Bank of Baroda</option><option>Bank of India</option><option>Bank of Maharashtra</option><option>Canara Bank</option><option>Central Bank of India</option><option>Indian Bank</option><option>Indian Overseas Bank</option><option>Punjab National Bank</option><option>Punjab &amp; Sind Bank</option><option>UCO Bank</option><option>Union Bank of India</option></optgroup><optgroup label="Private Sector Banks"><option>Axis Bank</option><option>Bandhan Bank</option><option>CSB Bank</option><option>City Union Bank</option><option>DCB Bank</option><option>Dhanlaxmi Bank</option><option>Federal Bank</option><option>HDFC Bank</option><option>ICICI Bank</option><option>IDBI Bank</option><option>IDFC FIRST Bank</option><option>IndusInd Bank</option><option>Jammu &amp; Kashmir Bank</option><option>Karnataka Bank</option><option>Karur Vysya Bank</option><option>Kotak Mahindra Bank</option><option>RBL Bank</option><option>South Indian Bank</option><option>Tamilnad Mercantile Bank</option><option>Yes Bank</option></optgroup><optgroup label="Small Finance Banks"><option>AU Small Finance Bank</option><option>Capital Small Finance Bank</option><option>Equitas Small Finance Bank</option><option>ESAF Small Finance Bank</option><option>Jana Small Finance Bank</option><option>North East Small Finance Bank</option><option>Shivalik Small Finance Bank</option><option>Suryoday Small Finance Bank</option><option>Ujjivan Small Finance Bank</option><option>Unity Small Finance Bank</option><option>Utkarsh Small Finance Bank</option></optgroup><optgroup label="Payments Banks"><option>India Post Payments Bank</option><option>Fino Payments Bank</option><option>Jio Payments Bank</option><option>NSDL Payments Bank</option><option>Paytm Payments Bank</option></optgroup><optgroup label="Other Banks Operating in India"><option>DBS Bank India</option><option>HSBC India</option><option>Standard Chartered Bank India</option><option>Deutsche Bank India</option><option>Bank of America India</option><option>Barclays Bank India</option><option>BNP Paribas India</option><option>Citibank India</option><option>J.P. Morgan India</option><option>MUFG Bank India</option><option>Qatar National Bank India</option><option>Societe Generale India</option></optgroup></select></label><label>Account type<select name="account_type" required=""><option value="">Select account type</option><option value="savings">Savings</option><option value="current">Current</option><option value="corporate">Corporate</option></select></label><label>Account number<input autocomplete="off" inputmode="numeric" maxlength="24" name="account_number" placeholder="6–24 digits" required=""/></label><label>IFSC code<input autocomplete="off" maxlength="11" name="ifsc_code" placeholder="e.g. SBIN0001234" required="" style="text-transform:uppercase"/></label><label>Account holder name<input maxlength="120" name="account_holder" placeholder="Name on account" required=""/></label><label>Mobile number<input autocomplete="tel" inputmode="numeric" maxlength="10" name="mobile_number" placeholder="10-digit mobile number" required=""/></label><button class="primary" type="submit">Save Bank Account</button></form><div class="notice">For security, MASTERPAY stores only the last 4 digits in this starter. Use a verified banking/payment provider before using these details for real payouts.</div><div class="msg" id="bankMsg"></div></div></section>
-<section class="view" id="transactions"><div class="panel"><span class="eyebrow">ACTIVITY</span><h2>Transactions</h2><p class="muted">Your account transaction history.</p><div class="table-wrap"><table><thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div></div></section>
-<section class="view" id="notifications"><div class="panel"><span class="eyebrow">UPDATES</span><h2>Notifications</h2><p class="muted">Important account messages will appear here.</p><div class="empty-state" id="notificationList"><span>◉</span><b>No new notifications</b><small>You're all caught up.</small></div></div></section>
+<section class="view" id="transactions"><div class="panel"><div class="panel-title"><div><span class="eyebrow">RECENT TRANSACTIONS</span><h2>Demo Transaction History</h2><p class="muted">Synthetic activity styled after the reference screen.</p></div><div class="transaction-count"><small>Total Transactions</small><strong id="txTotalCount">0</strong></div></div><div class="notice demo-notice"><b>DEMO SIMULATION</b> — all SIM-DEMO entries are synthetic. They do not represent bank activity and cannot move or withdraw real funds.</div><div class="table-wrap"><table><thead><tr><th>Type / Name</th><th>Amount</th><th>Commission</th><th>Status</th><th>Date</th></tr></thead><tbody id="txBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></div></section>
+<section class="view" id="notifications"><div class="panel"><div class="panel-title"><div><span class="eyebrow">UPDATES</span><h2>Notifications</h2><p class="muted">Demo activity alerts and account messages.</p></div><button class="ghost" id="markNotificationsRead" type="button">Mark all read</button></div><div id="notificationList" class="notification-list"><div class="empty-state"><span>◉</span><b>No notifications</b><small>You're all caught up.</small></div></div></div></section>
+<div class="demo-toast hidden" id="demoToast" role="status" aria-live="polite"><div class="toast-icon" id="demoToastIcon">₹</div><div><b id="demoToastTitle">DEMO CREDIT ALERT</b><strong id="demoToastAmount">₹0.00</strong><small id="demoToastBody">Simulation only</small></div><button id="demoToastClose" type="button" aria-label="Close">×</button></div>
 <section class="view" id="support"><div class="panel"><span class="eyebrow">HELP CENTER</span><h2>Support</h2><p class="muted">Choose how you want to contact MASTERPAY.</p><div class="wallet-actions"><a class="primary" href="https://t.me/masterpayof" rel="noopener noreferrer" target="_blank">Official Telegram Channel</a><a class="secondary" href="https://t.me/masterpay_xiao" rel="noopener noreferrer" target="_blank">Customer Support Executive</a></div></div></section>
 <section class="view" id="security"><div class="panel"><span class="eyebrow">SECURITY</span><h2>Security</h2><p class="muted">Basic account-security information.</p><div class="security-list"><div><b>Session</b><span>HTTP-only authentication cookie</span></div><div><b>Password</b><span>Stored as a server-side hash</span></div><div><b>Transport</b><span>Use HTTPS in production</span></div></div><div class="notice">Never share your password, database credentials, JWT secret, or payment credentials.</div></div></section>
 <section class="view" id="admin">

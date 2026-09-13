@@ -95,11 +95,46 @@ $("#openBankFromWallet").onclick=()=>{ document.querySelectorAll(".view").forEac
 $("#bindWithdrawalBank")?.addEventListener("click",()=>$("#openBankFromWallet").click());
 $$('.close-form').forEach(b=>b.onclick=()=>b.closest('.form-panel')?.classList.add('hidden'));
 
+const depositPlan = $("#depositPlan");
+const paymentDetails = $("#paymentDetails");
+const selectedDepositAmount = $("#selectedDepositAmount");
+
+depositPlan?.addEventListener("change", () => {
+  const amount = Number(depositPlan.value);
+  if (Number.isFinite(amount) && amount > 0) {
+    selectedDepositAmount.textContent = money(amount);
+    paymentDetails.classList.remove("hidden");
+  } else {
+    selectedDepositAmount.textContent = "₹0.00";
+    paymentDetails.classList.add("hidden");
+  }
+});
+
 $("#depositForm")?.addEventListener("submit",async(e)=>{
-  e.preventDefault(); $("#walletMsg").textContent="Creating deposit request…";
+  e.preventDefault();
+  $("#walletMsg").textContent="Submitting deposit request…";
   const body=Object.fromEntries(new FormData(e.target));
-  try{const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});$("#walletMsg").textContent=d.message; e.target.reset(); await loadData();}
-  catch(err){$("#walletMsg").textContent=err.message;}
+  body.utr=String(body.utr||"").trim();
+
+  if(!body.amount || !body.utr){
+    $("#walletMsg").textContent="Select a plan and enter the UTR / Transaction ID.";
+    return;
+  }
+
+  const submit=$("#submitDeposit");
+  if(submit) submit.disabled=true;
+  try{
+    const d=await api("/api/deposits",{method:"POST",body:JSON.stringify(body)});
+    $("#walletMsg").textContent=d.message;
+    e.target.reset();
+    selectedDepositAmount.textContent="₹0.00";
+    paymentDetails.classList.add("hidden");
+    await loadData();
+  }catch(err){
+    $("#walletMsg").textContent=err.message;
+  }finally{
+    if(submit) submit.disabled=false;
+  }
 });
 
 $("#withdrawForm")?.addEventListener("submit",async(e)=>{

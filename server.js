@@ -37,7 +37,8 @@ async function ensurePaymentSettings(){
       upi_id TEXT NOT NULL DEFAULT 'rohitnagar3870@ibl',
       upi_name TEXT NOT NULL DEFAULT 'ROHIT NARAYANSINGH',
       qr_image_url TEXT NOT NULL DEFAULT '/assets/upi-qr.jpeg',
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      next_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
@@ -245,6 +246,33 @@ function requireSameOrigin(req, res, next) {
 
 const DEMO_COMMISSION_RATE = 0.07;
 
+const DEMO_SEQUENCE = [
+  {type:'deposit',  multiplier:0.84, name:'Kavita Desai'},
+  {type:'deposit',  multiplier:0.66, name:'Vikram Singh'},
+  {type:'withdrawal', multiplier:0.54, name:'Neha Joshi'},
+  {type:'deposit',  multiplier:0.72, name:'Rahul Yadav'},
+  {type:'withdrawal', multiplier:0.48, name:'Meera Kapoor'},
+  {type:'deposit',  multiplier:0.60, name:'Priya Verma'},
+  {type:'deposit',  multiplier:0.42, name:'Anjali Gupta'},
+  {type:'withdrawal', multiplier:0.36, name:'Sakshi Patel'},
+  {type:'deposit',  multiplier:0.54, name:'Arjun Mehta'},
+  {type:'withdrawal', multiplier:0.30, name:'Riya Sharma'},
+  {type:'deposit',  multiplier:0.30, name:'Nitin Kumar'},
+  {type:'withdrawal', multiplier:0.24, name:'Pooja Jain'},
+  {type:'deposit',  multiplier:0.84, name:'Aarav Shah'},
+  {type:'withdrawal', multiplier:0.42, name:'Simran Kaur'},
+  {type:'deposit',  multiplier:0.72, name:'Manish Gupta'},
+  {type:'withdrawal', multiplier:0.36, name:'Isha Mehta'},
+  {type:'deposit',  multiplier:0.60, name:'Rohan Verma'},
+  {type:'withdrawal', multiplier:0.30, name:'Nisha Patel'},
+  {type:'deposit',  multiplier:0.54, name:'Aditya Jain'},
+  {type:'withdrawal', multiplier:0.24, name:'Pallavi Singh'},
+  {type:'deposit',  multiplier:0.54, name:'Karan Malhotra'},
+  {type:'withdrawal', multiplier:0.24, name:'Divya Sharma'},
+  {type:'deposit',  multiplier:0.42, name:'Sonal Kapoor'},
+  {type:'withdrawal', multiplier:0.18, name:'Vivek Joshi'}
+];
+
 function demoRef(prefix){
   return `SIM-DEMO-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
 }
@@ -253,64 +281,119 @@ function moneyForDb(v){
   return `₹${Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 }
 
-// Demo transaction generator. SIM-DEMO references keep this activity separate
-// from real/pending financial requests. The demo wallet balance is updated so
-// the test wallet visibly reflects the generated credits, debits and commission.
-async function createDemoActivity(client, userId, depositAmount, bankInfo){
-  const base = Number(depositAmount);
-  const names = [
-    'Kavita Desai','Vikram Singh','Neha Joshi','Rahul Yadav','Meera Kapoor',
-    'Priya Verma','Anjali Gupta','Sakshi Patel','Arjun Mehta','Riya Sharma',
-    'Nitin Kumar','Pooja Jain'
-  ];
-  const multipliers = [0.14,0.11,0.09,0.12,0.08,0.10,0.07,0.06,0.09,0.05,0.05,0.04];
-  const types = ['deposit','deposit','withdrawal','deposit','withdrawal','deposit','deposit','withdrawal','deposit','withdrawal','deposit','withdrawal'];
-  const totalMultiplier = multipliers.reduce((a,b)=>a+b,0);
-  const scale = Math.max(1, 3 / totalMultiplier);
-  let remaining = Number((base * 3).toFixed(2));
+async function ensureDemoStreamTable(){
+  if(!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS demo_streams (
+      user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      seed_amount NUMERIC(14,2) NOT NULL,
+      next_index INTEGER NOT NULL DEFAULT 0,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`ALTER TABLE demo_streams ADD COLUMN IF NOT EXISTS next_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
 
-  const entries=[];
-  for(let i=0;i<multipliers.length;i++){
-    let amount = i===multipliers.length-1 ? remaining : Number((base*multipliers[i]*scale).toFixed(2));
-    remaining = Number((remaining-amount).toFixed(2));
-    if(amount<1) amount=1;
-    entries.push({
-      type:types[i], amount, name:names[i],
-      commission:Number((amount*DEMO_COMMISSION_RATE).toFixed(2))
-    });
-  }
+async function startDemoStream(client, userId, seedAmount){
+  const existing = await client.query(
+    `SELECT active FROM demo_streams WHERE user_id=$1 FOR UPDATE`, [userId]
+  );
+  if(existing.rowCount && existing.rows[0].active) return false;
+  // Start every new demo run from a clean demo history. Only synthetic rows and
+  // synthetic alerts are removed here; real/pending transactions are untouched.
+  await client.query(`DELETE FROM transactions WHERE user_id=$1 AND reference LIKE 'SIM-DEMO-%'`,[userId]);
+  await client.query(`DELETE FROM notifications WHERE user_id=$1 AND title IN ('CREDIT ALERT','DEBIT ALERT')`,[userId]);
+  await client.query(
+    `INSERT INTO demo_streams(user_id,seed_amount,next_index,active,updated_at,next_at)
+     VALUES($1,$2,0,TRUE,NOW(),NOW())
+     ON CONFLICT(user_id) DO UPDATE SET seed_amount=EXCLUDED.seed_amount,next_index=0,active=TRUE,updated_at=NOW(),next_at=NOW()`,
+    [userId, Number(seedAmount).toFixed(2)]
+  );
+  return true;
+}
 
-  for(let i=0;i<entries.length;i++){
-    const entry=entries[i];
-    const ref=demoRef(entry.type==='deposit'?'CREDIT':'DEBIT');
-    const createdAt = new Date(Date.now() - (entries.length-i)*7000);
+// Generates exactly ONE demo transaction per call. The browser calls this
+// periodically, so the user sees credits/debits and notifications arrive one
+// at a time instead of all being inserted at once.
+async function generateNextDemoTransaction(userId){
+  const client = await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const stream = await client.query(
+      `SELECT user_id,seed_amount,next_index,active,next_at
+       FROM demo_streams WHERE user_id=$1 FOR UPDATE`, [userId]
+    );
+    if(!stream.rowCount || !stream.rows[0].active){
+      await client.query('COMMIT');
+      return {generated:false,active:false};
+    }
+
+    const row=stream.rows[0];
+    const index=Number(row.next_index||0);
+    const nextAt=row.next_at ? new Date(row.next_at).getTime() : Date.now();
+    const now=Date.now();
+    if(now < nextAt){
+      await client.query('COMMIT');
+      return {generated:false,active:true,waitSeconds:Math.ceil((nextAt-now)/1000)};
+    }
+    if(index >= DEMO_SEQUENCE.length){
+      await client.query(`UPDATE demo_streams SET active=FALSE,updated_at=NOW() WHERE user_id=$1`,[userId]);
+      await client.query('COMMIT');
+      return {generated:false,active:false};
+    }
+
+    const spec=DEMO_SEQUENCE[index];
+    const amount=Number((Number(row.seed_amount)*spec.multiplier).toFixed(2));
+    const commission=spec.type==='deposit' ? Number((amount*DEMO_COMMISSION_RATE).toFixed(2)) : 0;
+    const reference=demoRef(spec.type==='deposit'?'CREDIT':'DEBIT');
+
     await client.query(
       `INSERT INTO transactions(user_id,type,amount,status,reference,created_at)
-       VALUES($1,$2,$3,'completed',$4,$5)`,
-      [userId,entry.type,entry.amount.toFixed(2),ref,createdAt]
+       VALUES($1,$2,$3,'completed',$4,NOW())`,
+      [userId,spec.type,amount.toFixed(2),reference]
     );
-    await client.query(
-      `INSERT INTO notifications(user_id,title,body,created_at) VALUES($1,$2,$3,$4)`,
-      [userId,
-       `${entry.type==='deposit'?'CREDIT':'DEBIT'} ALERT`,
-       `${entry.name}: ${entry.type==='deposit'?'credited':'debited'} ${moneyForDb(entry.amount)}. Commission: ${moneyForDb(entry.commission)}.`,
-       createdAt]
-    );
-  }
 
-  const volume=entries.reduce((sum,e)=>sum+e.amount,0);
-  const commission=Number((volume*DEMO_COMMISSION_RATE).toFixed(2));
-  const credits=entries.filter(e=>e.type==='deposit').reduce((sum,e)=>sum+e.amount,0);
-  const debits=entries.filter(e=>e.type==='withdrawal').reduce((sum,e)=>sum+e.amount,0);
-  // Apply the demo net result to the user's test wallet. This is not connected
-  // to any external bank/payment provider; SIM-DEMO transactions are synthetic.
-  const walletDelta = Number((credits - debits + commission).toFixed(2));
-  const updated = await client.query(
-    `UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + $1
-     WHERE id=$2 RETURNING wallet_balance`,
-    [walletDelta.toFixed(2), userId]
-  );
-  return {count:entries.length,credits,debits,volume,commission,walletDelta:Number(updated.rows[0]?.wallet_balance||0)};
+    await client.query(
+      `INSERT INTO notifications(user_id,title,body,created_at)
+       VALUES($1,$2,$3,NOW())`,
+      [userId,
+       `${spec.type==='deposit'?'CREDIT':'DEBIT'} ALERT`,
+       `${spec.name}: ${spec.type==='deposit'?'credited':'debited'} ${moneyForDb(amount)}${commission ? `. Commission earned: ${moneyForDb(commission)}.` : '.'}`]
+    );
+
+    // Credit adds the transaction amount plus its 7% commission. Debit subtracts
+    // only the debit amount. This makes the demo wallet move entry-by-entry.
+    const walletDelta=spec.type==='deposit' ? amount+commission : -amount;
+    const updated=await client.query(
+      `UPDATE users SET wallet_balance=COALESCE(wallet_balance,0)+$1
+       WHERE id=$2 RETURNING wallet_balance`,
+      [walletDelta.toFixed(2),userId]
+    );
+
+    const nextIndex=index+1;
+    const active=nextIndex<DEMO_SEQUENCE.length;
+    const delaySeconds=15000 + Math.floor(Math.random()*10001);
+    await client.query(
+      `UPDATE demo_streams SET next_index=$1,active=$2,updated_at=NOW(),next_at=CASE WHEN $2 THEN NOW() + ($3 * INTERVAL '1 millisecond') ELSE NOW() END WHERE user_id=$4`,
+      [nextIndex,active,delaySeconds,userId]
+    );
+    await client.query('COMMIT');
+    return {
+      generated:true,
+      active:nextIndex<DEMO_SEQUENCE.length,
+      type:spec.type,
+      amount,
+      commission,
+      wallet_balance:Number(updated.rows[0]?.wallet_balance||0),
+      index:nextIndex,
+      nextInSeconds:active ? Math.round(delaySeconds/1000) : 0
+    };
+  }catch(e){
+    try{await client.query('ROLLBACK');}catch{}
+    throw e;
+  }finally{client.release();}
 }
 
 app.get("/api/banks", auth, async (req, res) => {
@@ -441,13 +524,13 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
        RETURNING id,type,amount,status,reference,utr,created_at`,
       [req.user.sub, amount.toFixed(2), reference, utr]
     );
-    const demo = await createDemoActivity(client, req.user.sub, amount, bank.rows[0]);
+    const started = await startDemoStream(client, req.user.sub, amount);
     await client.query('COMMIT');
     res.status(201).json({
       ok:true,
       transaction:result.rows[0],
-      demo,
-      message:"Deposit request submitted. Transaction activity and 7% commission were calculated and added to the test wallet."
+      demo:{started,active:true},
+      message:"Deposit request submitted. Your demo credits and debits will arrive one by one."
     });
   } catch (e) {
     try { await client.query('ROLLBACK'); } catch {}
@@ -458,31 +541,14 @@ app.post("/api/deposits", auth, requireSameOrigin, async (req, res) => {
   }
 });
 
-app.post("/api/demo/start", auth, requireSameOrigin, async (req, res) => {
-  if (!requireDb(res)) return;
-  const requestedAmount = Number(req.body?.amount);
-  const amount = Number.isFinite(requestedAmount) && requestedAmount >= 1 && requestedAmount <= 1000000
-    ? requestedAmount : 10000;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const bank = await client.query(
-      `SELECT id,bank_name,account_last4,status FROM bank_accounts WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`,
-      [req.user.sub]
-    );
-    if (!bank.rowCount) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ok:false,message:"Add a bank account first. This demo needs a linked account."});
-    }
-    const demo = await createDemoActivity(client, req.user.sub, amount, bank.rows[0]);
-    await client.query('COMMIT');
-    res.status(201).json({ok:true,demo,message:`Transaction activity generated for ${moneyForDb(amount)} and added to the test wallet.`});
-  } catch(e) {
-    try { await client.query('ROLLBACK'); } catch {}
+app.post("/api/demo/tick", auth, requireSameOrigin, async (req,res)=>{
+  if(!requireDb(res)) return;
+  try{
+    const result=await generateNextDemoTransaction(req.user.sub);
+    res.json({ok:true,...result});
+  }catch(e){
     console.error(e);
-    res.status(500).json({ok:false,message:"Could not start demo activity."});
-  } finally {
-    client.release();
+    res.status(500).json({ok:false,message:"Could not generate the next demo transaction."});
   }
 });
 
@@ -501,7 +567,8 @@ app.get("/api/commission-summary", auth, async (req, res) => {
     );
     const row=result.rows[0]||{};
     const volume=Number(row.volume||0), credits=Number(row.credits||0), debits=Number(row.debits||0);
-    res.json({ok:true,rate:DEMO_COMMISSION_RATE,count:Number(row.count||0),volume:volume.toFixed(2),credits:credits.toFixed(2),debits:debits.toFixed(2),net:(credits-debits).toFixed(2),commission:(volume*DEMO_COMMISSION_RATE).toFixed(2),demo:true});
+    const commission=Number((credits*DEMO_COMMISSION_RATE).toFixed(2));
+    res.json({ok:true,rate:DEMO_COMMISSION_RATE,count:Number(row.count||0),volume:volume.toFixed(2),credits:credits.toFixed(2),debits:debits.toFixed(2),net:(credits-debits).toFixed(2),commission:commission.toFixed(2),demo:true});
   } catch(e) {
     console.error(e);
     res.status(500).json({ok:false,message:"Could not load demo summary."});
@@ -590,6 +657,7 @@ app.use((_req, res) => {
   try{
     await ensurePaymentSettings();
     await ensureDemoTables();
+    await ensureDemoStreamTable();
     await ensureAdminAccount();
   } catch(e){
     console.error("Startup initialization failed:",e.message);

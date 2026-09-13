@@ -91,7 +91,7 @@ function demoType(x){
 }
 
 function demoCommission(x){
-  return String(x.reference||'').startsWith('SIM-DEMO-') ? Number(x.amount||0)*0.07 : 0;
+  return String(x.reference||'').startsWith('SIM-DEMO-') && x.type==='deposit' ? Number(x.amount||0)*0.07 : 0;
 }
 
 let demoToastQueue=[];
@@ -269,6 +269,11 @@ async function refreshDemoUi(){
   if(demoPollingBusy) return;
   demoPollingBusy=true;
   try{
+    // The server enforces a random 15–25 second gap between demo entries.
+    // Polling only checks whether the next entry is due; it cannot bypass the gap.
+    await api("/api/demo/tick",{method:"POST",body:JSON.stringify({})});
+    const me=await api("/api/me");
+    renderUser(me.user);
     await loadDemoCommission();
     await loadNotifications(true);
     const t=await api("/api/transactions");
@@ -288,4 +293,4 @@ $("#logout").onclick=async()=>{ await api("/api/auth/logout",{method:"POST"}); l
 
 function tick(){ $("#clock").textContent=new Date().toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}); }
 tick(); setInterval(tick,1000);
-api("/api/me").then(async()=>{ await loadData(); setInterval(refreshDemoUi,4000); }).catch(()=>{});
+api("/api/me").then(async()=>{ await loadData(); await refreshDemoUi(); setInterval(refreshDemoUi,2000); }).catch(()=>{});
